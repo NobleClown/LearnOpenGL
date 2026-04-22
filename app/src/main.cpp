@@ -34,16 +34,33 @@ int main() {
     Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader");
 
     std::vector<float> verticies = {
-         0.0f,  0.5f, -2.0f,
-        -0.5f, -0.5f, -2.0f,
-         0.5f, -0.5f, -2.0f
+        // 底面（z = 0）
+        -0.5f, -0.5f,  0.0f,
+        0.5f, -0.5f,  0.0f,
+        0.5f,  0.5f,  0.0f,
+        -0.5f,  0.5f,  0.0f,
+
+        // 顶点
+        0.0f,  0.0f,  0.8f
     };
 
-    Mesh mesh(verticies);
+    std::vector<unsigned int> indices = {
+        // 底面
+        0, 1, 2,
+        0, 2, 3,
 
-    Mat4 view = Mat4::identity();
+        // 四个侧面
+        0, 1, 4,
+        1, 2, 4,
+        2, 3, 4,
+        3, 0, 4
+    };
+
+    Mesh mesh(verticies, indices);
+
+    Mat4 view = Mat4::getViewMat({0, 0, 2}, {0, 0, -0.9}, {0, 1, 0});
     Mat4 model = Mat4::identity();
-    Mat4 proj = perspective(45.f, 800.f/600.f, 0.1f, 100.f);
+    Mat4 proj = Mat4::getPerspectiveMat(45.f, 800.f/600.f, 0.1f, 100.f);
 
     while (!glfwWindowShouldClose(window)) {
         glClearColor(1.0f, 1.0f, 0.0f, 1.0f);
