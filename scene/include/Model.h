@@ -5,6 +5,7 @@
 #include <sstream>
 #include <vector>
 #include "../../mathtool/include/MathType.h"
+#include "Mesh.h"
 #include "Material.h"
 
 struct Triangle {
@@ -34,20 +35,20 @@ struct VertexKeyHash {
     }
 };
 
-class Mesh {
-public:
-    std::string name;
-    std::vector<Vertex> getVerticies() const { return verticies; }
-    std::vector<uint32_t> getIndexBuffer() const { return indices; }
-    void addVertex(const Vertex& v) { verticies.emplace_back(v); }
-    void addIndex(const uint32_t& p) { indices.emplace_back(p); }
-    void setMaterial(Material* _material) { material = _material; }
-    Material* getMaterial() const { return material; }
-private:
-    std::vector<Vertex> verticies;
-    std::vector<uint32_t> indices;
-    Material* material;
-};
+// class Mesh {
+// public:
+//     std::string name;
+//     std::vector<Vertex> getVerticies() const { return verticies; }
+//     std::vector<uint32_t> getIndexBuffer() const { return indices; }
+//     void addVertex(const Vertex& v) { verticies.emplace_back(v); }
+//     void addIndex(const uint32_t& p) { indices.emplace_back(p); }
+//     void setMaterial(Material* _material) { material = _material; }
+//     Material* getMaterial() const { return material; }
+// private:
+//     std::vector<Vertex> verticies;
+//     std::vector<uint32_t> indices;
+//     Material* material;
+// };
 
 class Model {
 public:

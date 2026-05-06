@@ -7,8 +7,9 @@ add_executable(OpenGLEngine
     app/src/main.cpp
     glad/src/glad.c
     shaders/src/Shader.cpp
-    mesh/src/Mesh.cpp
-    math/src/MathType.cpp
+    scene/src/Mesh.cpp
+    scene/src/Model.cpp
+    mathtool/src/MathType.cpp
 )
 
 target_include_directories(OpenGLEngine PRIVATE

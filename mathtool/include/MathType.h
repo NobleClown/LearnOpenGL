@@ -43,6 +43,14 @@ struct Vec4 {
     Vec4 operator/(const float m) const { return Vec4{ x / m, y / m, z / m, w / m }; }
 };
 
+struct Vertex {
+    Vec3 position;
+    Vec3 normal;
+    Vec2 uv;
+    Vertex() {};
+    Vertex(const Vertex& other):position(other.position), normal(other.normal), uv(other.uv) {}
+};
+
 struct Mat4 {
     float m[16] = {0};
 

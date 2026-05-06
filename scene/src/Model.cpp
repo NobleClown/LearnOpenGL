@@ -18,11 +18,11 @@ bool Model::LoadOBJ(const std::string& path) {
     std::vector<uint32_t> uv_idxes;
     std::vector<uint32_t> normal_idxes;
 
+    Mesh mesh;
+    std::unordered_map<VertexKey, uint32_t, VertexKeyHash> vertexMap;
     while (std::getline(obj_file, line)) {
         if (line.empty() || line[0] == '#') continue;
 
-        std::unordered_map<VertexKey, uint32_t, VertexKeyHash> vertexMap;
-        Mesh mesh;
         std::stringstream ss(line);
         std::string type;
         ss >> type;
@@ -75,7 +75,7 @@ bool Model::LoadOBJ(const std::string& path) {
             for (size_t i=1; i+1<face.size(); i++) {
                 VertexKey tri[3] = {face[0], face[i], face[i+1]};
 
-                for (int k; k<3; k++) {
+                for (int k=0; k<3; k++) {
                     VertexKey key = tri[k];
 
                     if (vertexMap.find(key) != vertexMap.end()) {
@@ -83,18 +83,18 @@ bool Model::LoadOBJ(const std::string& path) {
                     } else {
                         Vertex v;
                         v.position = positions[key.vIdx];
-                        v.uv = (key.vtIdx > 0) ? uvs[key.vtIdx];
-                        v.normal = (key.vnIdx > 0) ? normals[key.vnIdx];
+                        v.uv = (key.vtIdx >= 0) ? uvs[key.vtIdx] : Vec2{0, 0};
+                        v.normal = (key.vnIdx >= 0) ? normals[key.vnIdx] : Vec3{0, 0, 0};
                         mesh.addVertex(v);
                         vertexMap[key] = mesh.getVerticies().size() - 1;
-                        mesh.addIndex(mesh.getVerticies.size() - 1);
+                        mesh.addIndex(mesh.getVerticies().size() - 1);
                     }
                 }
             }
         } 
     }
 
-    if (!mesh.getVertices().empty())
+    if (!mesh.getVerticies().empty())
         m_meshes.emplace_back(mesh);
     return true;
 }

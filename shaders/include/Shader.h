@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <glad/glad.h>
 
-#include "../../math/include/MathType.h"
+#include "../../mathtool/include/MathType.h"
 
 class Shader {
 public:
@@ -18,6 +18,7 @@ public:
     void setInt(const std::string& name, int value);
     void setFloat(const std::string& name, float value);
     void setMat4(const std::string& name, const Mat4& mat);
+    void setVec3(const std::string& name, const Vec3& vec);
 private:
     unsigned int programID;
 
