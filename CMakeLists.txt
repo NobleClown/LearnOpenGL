@@ -9,12 +9,17 @@ add_executable(OpenGLEngine
     shaders/src/Shader.cpp
     scene/src/Mesh.cpp
     scene/src/Model.cpp
+    scene/src/Texture.cpp
+    scene/src/Camera.cpp
     mathtool/src/MathType.cpp
+    external/stb_image/src/stb_image_impl.cpp
 )
 
 target_include_directories(OpenGLEngine PRIVATE
     include
     external/glfw/include
+    external/stb_image/include
+    external/assimp/include
     glad/include
 )
 

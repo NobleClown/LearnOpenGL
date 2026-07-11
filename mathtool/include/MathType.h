@@ -51,6 +51,16 @@ struct Vertex {
     Vertex(const Vertex& other):position(other.position), normal(other.normal), uv(other.uv) {}
 };
 
+// struct Triangle {
+//     Vertex v0, v1, v2;
+// };
+
+struct AABB {
+    float x_min, x_max;
+    float y_min, y_max;
+    float z_min, z_max;
+};
+
 struct Mat4 {
     float m[16] = {0};
 

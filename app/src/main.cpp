@@ -5,99 +5,369 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <cmath>
 
 #include "../../shaders/include/Shader.h"
 #include "../../scene/include/Mesh.h"
 #include "../../mathtool/include/MathType.h"
 #include "../../scene/include/Model.h"
+#include "../../scene/include/Texture.h"
+#include "../../scene/include/Camera.h"
 
-// Mat4 perspective(float fov, float aspect, float nearPlane, float farPlane) {
-//     Mat4 r = {};
+Vec3 cam_forward = {0.f, 0.f, 1.f};
+float cam_fov = 45.f;
 
-//     float t = tan(fov / 2.0f * PI / 180.f);
-//     r.m[0] = 1.0f / (aspect * t);
-//     r.m[5] = 1.0f / t;
-//     r.m[10] = -(nearPlane + farPlane) / (farPlane - nearPlane);
-//     r.m[11] = -1.0f;
-//     r.m[14] = -(2 * nearPlane * farPlane) / (farPlane - nearPlane);
+void pressInput(GLFWwindow* window, Camera& cam) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) 
+        cam.position = cam.position + cam.forward * cam.speed;
+    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cam.position = cam.position - cam.forward * cam.speed;
+    else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cam.position = cam.position - cam.forward.crossProduct(cam.up).normalize() * cam.speed;
+    else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cam.position = cam.position + cam.forward.crossProduct(cam.up).normalize() * cam.speed;
+}
 
-//     return r;
-// }
+void mouseCallback(GLFWwindow* window, double xPos, double yPos) {
+    static bool firstMouse = true;
+    static float lastX = 400.f;
+    static float lastY = 300.f;
+    static float yaw = 0.f;
+    static float pitch = 0.f;
+
+    if (firstMouse) {
+        lastX = xPos;
+        lastY = yPos;
+        firstMouse = false;
+    }
+
+    float xOffset = xPos - lastX;
+    float yOffset = yPos - lastY;
+    lastX = xPos;
+    lastY = yPos;
+
+    float sensitivity = 0.05f;
+    xOffset *= sensitivity;
+    yOffset *= sensitivity;
+
+    yaw += xOffset;
+    pitch += yOffset;
+
+    pitch = std::max(pitch, -89.f);
+    pitch = std::min(pitch, 89.f);
+
+    float yaw_rad = yaw * PI / 180.f;
+    float pitch_rad = pitch * PI / 180.f;
+
+    cam_forward.x = std::cos(yaw_rad) * std::cos(pitch_rad);
+    cam_forward.y = std::sin(pitch_rad);
+    cam_forward.z = std::sin(yaw_rad) * std::cos(pitch_rad);
+}
+
+void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
+    if (cam_fov >= 1.f && cam_fov <= 45.f) 
+        cam_fov -= yOffset;
+    cam_fov = std::max(cam_fov, 1.f);
+    cam_fov = std::min(cam_fov, 45.f);
+}
 
 int main() {
     if (!glfwInit()) return -1;
 
+    // 指定主次版本号、以及使用核心模式
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    // 创建窗口
     GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", NULL, NULL);
     glfwMakeContextCurrent(window);
 
+    // glad 用于管理opengl函数指针，调用opengl函数前需要初始化函数指针
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
     Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader");
+    Shader lightShader("../../shaders/vertexshaders/light.shader", "../../shaders/fragmentshaders/light.shader");
 
-    // std::vector<float> verticies = {
-    //     // 底面（z = 0）
-    //     -0.5f, -0.5f,  0.0f,
-    //     0.5f, -0.5f,  0.0f,
-    //     0.5f,  0.5f,  0.0f,
-    //     -0.5f,  0.5f,  0.0f,
+    // Model connelBox;
+    // connelBox.LoadOBJ("../../assets/ConnelBox.obj");
+    // std::vector<Mesh> meshes = connelBox.GetMeshes();
 
-    //     // 顶点
-    //     0.0f,  0.0f,  0.8f
-    // };
+    // Mat4 view = Mat4::getViewMat({0, 0, -20}, {0.f, 0.f, 0.f}, {0, 1, 0});
+    // Mat4 model = Mat4::getRotateMat({55.f, 0.f, 0.f});
+    // Mat4 model = Mat4::identity();
 
-    // std::vector<unsigned int> indices = {
-    //     // 底面
-    //     0, 1, 2,
-    //     0, 2, 3,
+    Camera cam;
+    cam.position = {0.f, 0.f, 3.f};
+    cam.forward = {0.f, 0.f, 1.f};
+    cam.up = {0.f, 1.f, 0.f};
+    cam.fov = 45.f;
+    cam.aspect = 800.f / 600.f;
+    cam.nearPlane = 0.1f;
+    cam.farPlane = 100.f;
+    cam.speed = 0.05f;
 
-    //     // 四个侧面
-    //     0, 1, 4,
-    //     1, 2, 4,
-    //     2, 3, 4,
-    //     3, 0, 4
-    // };
-    Model connelBox;
-    connelBox.LoadOBJ("../../assets/ConnelBox.obj");
-    std::vector<Mesh> meshes = connelBox.GetMeshes();
-    // Mesh mesh(verticies, indices);
+    float vertices[] = {
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
+         0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
+         0.5f,  0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
+        -0.5f,  0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
 
-    Mat4 view = Mat4::getViewMat({-0.2, 2.5, 5.f}, {-0.2, 2.5, -2.5}, {0, 1, 0});
-    Mat4 model = Mat4::identity();
-    Mat4 proj = Mat4::getPerspectiveMat(45.f, 800.f/600.f, 0.1f, 100.f);
+        -0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+         0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+         0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+        -0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 
-    glfwWindowHint(GLFW_DEPTH_BITS, 24);
+        -0.5f,  0.5f,  0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        -0.5f,  0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f,  0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+
+         0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+         0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+         0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+         0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+         0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+
+        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
+         0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,
+         0.5f, -0.5f,  0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+         0.5f, -0.5f,  0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        -0.5f, -0.5f,  0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
+
+        -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+         0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+         0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+        -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f
+    };
+
+    Mat4 positions[] = {
+        Mat4::getTranslateMat({0.f, 0.f, 0.f}),
+        Mat4::getTranslateMat({2.f, 5.f, -15.f}),
+        Mat4::getTranslateMat({-1.5f, -2.2f, -2.5f}),
+        Mat4::getTranslateMat({-3.8f, -2.0f, -12.3f}),
+        Mat4::getTranslateMat({2.4f, -0.4f, -3.5f}),
+        Mat4::getTranslateMat({-1.7f,  3.0f, -7.5f}),
+        Mat4::getTranslateMat({1.3f, -2.0f, -2.5f}),
+        Mat4::getTranslateMat({1.5f,  2.0f, -2.5f}),
+        Mat4::getTranslateMat({1.5f,  0.2f, -1.5f}),
+        Mat4::getTranslateMat({-1.3f,  1.0f, -1.5f}),
+    };
+
+    Vec3 lightPositions[] = {
+        {0.7f,  0.2f,  2.0f},
+        {2.3f, -3.3f, -4.0f},
+        {-4.0f,  2.0f, -12.0f},
+        {0.0f,  0.0f, -3.0f}
+    };
+
+    // unsigned int indices[] = {0, 1, 2, 0, 2, 3};
+
+    unsigned int VAO, VBO, EBO;
+
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    // 创建VBO，用于存储VertexBuffer数据
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, 36 * 8 * 4, vertices, GL_STATIC_DRAW);
+
+    // 创建EBO，用于存储indexbuffer数据
+    // glGenBuffers(1, &EBO);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 32, (void*)12);
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, (void*)24);
+    glEnableVertexAttribArray(2);
+
+    // glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, (void*)(6 * 4));
+    // glEnableVertexAttribArray(2);
+    glBindVertexArray(0);
+
+    unsigned int lightVAO;
+    glGenVertexArrays(1, &lightVAO);
+    glBindVertexArray(lightVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
+    // glfwWindowHint(GLFW_DEPTH_BITS, 24);
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    for (Mesh& mesh : meshes) {
-        mesh.uploadToGPU();
-    }
+    // glDepthFunc(GL_LESS);
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK);
+    // for (Mesh& mesh : meshes) {
+    //     mesh.uploadToGPU();
+    // }
 
+    Texture t_box, t_spec;
+    t_box.loadTexture("../../assets/container2.png", 0);
+    t_spec.loadTexture("../../assets/matrix.jpg", 1);
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouseCallback);
+    glfwSetScrollCallback(window, scrollCallback);
+
+    float deltatime = 0.0f;
+    float lastFrame = 0.0f;
+
+    // Vec3 lightPos({1.2f, 1.0f, 2.0f});
+    Mat4 lightModels[] = {
+        Mat4::getTranslateMat(lightPositions[0]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
+        Mat4::getTranslateMat(lightPositions[1]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
+        Mat4::getTranslateMat(lightPositions[2]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
+        Mat4::getTranslateMat(lightPositions[3]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
+    };
+
+
+    // glfwWindowShouldClose检查一次GLFW是否被要求退出，是就返回true，就停止循环，然后可以关闭应用程序
     while (!glfwWindowShouldClose(window)) {
         glClearColor(0.5f, 0.5f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // t1.setTexture();
+        glBindVertexArray(VAO);
+        // float radius = 10.f;
+        // float camX = sin(glfwGetTime()) * radius;
+        // float camZ = cos(glfwGetTime()) * radius;
+        // Mat4 view = Mat4::getViewMat({camX, 0, camZ}, {0.f, 0.f, 0.f}, {0, 1, 0});
+        float currentFrame = glfwGetTime();
+        deltatime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+        cam.speed = 2.5 * deltatime;
+        cam.forward = cam_forward.normalize();
+        cam.fov = cam_fov;
+        pressInput(window, cam);
+        Mat4 view = cam.getViewMat();
+        Mat4 proj = cam.getProjectionMat();
         shader.use();
-        shader.setMat4("model", model);
+        shader.setInt("material.diffuse", 0);
+        shader.setInt("material.specular", 1);
+
+        float curTime = glfwGetTime();
+        // shader.setVec3("lightColor", {sin(curTime * 2.0f), sin(curTime * 0.3f), sin(curTime * 1.7f)});
+        shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
+        // shader.setMat4("model", model);
         shader.setMat4("view", view);
         shader.setMat4("projection", proj);
-        shader.setVec3("cameraPos", {0, 0, 2});
-        shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
-        shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
-        for (Mesh& mesh : meshes) {
-            if (mesh.name == "area_light")
-                shader.setVec3("objectColor", {1.0f, 1.0f, 1.0f});
-            else if (mesh.name == "left_wall")
-                shader.setVec3("objectColor", {0.65, 0.05, 0.05});
-            else if (mesh.name == "right_wall")
-                shader.setVec3("objectColor", {0.0, 0.39, 0.0});
-            else 
-                shader.setVec3("objectColor", {0.76, 0.69, 0.57});
-            mesh.draw();
+        shader.setVec3("cameraPos", cam.position);
+
+        shader.setVec3("material.ambient", {1.0f, 0.5f, 0.31f});
+        shader.setVec3("material.diffuse", {1.0f, 0.5f, 0.31f});
+        // shader.setVec3("material.specular", {0.5f, 0.5f, 0.5f});
+        shader.setFloat("material.shininess", 32.0f);
+        // 聚光灯
+        shader.setVec3("spotLight.ambient", {0.2f, 0.2f, 0.2f});
+        shader.setVec3("spotLight.diffuse", {0.5f, 0.5f, 0.5f});
+        shader.setVec3("spotLight.specular", {1.0f, 1.0f, 1.0f});
+        shader.setVec3("spotLight.position", cam.position);
+        shader.setVec3("spotLight.direction", cam.forward);
+        shader.setFloat("spotLight.outterCutOff", cos(17.5 * PI / 180));
+        shader.setFloat("spotLight.cutOff", cos(12.5 * PI / 180));
+        
+        shader.setFloat("spotLight.constant", 1.0f);
+        shader.setFloat("spotLight.linear", 0.09f);
+        shader.setFloat("spotLight.quadratic", 0.032f);
+        // 平行光、太阳光
+        shader.setVec3("dirLight.ambient", {0.2f, 0.2f, 0.2f});
+        shader.setVec3("dirLight.diffuse", {0.5f, 0.5f, 0.5f});
+        shader.setVec3("dirLight.specular", {1.0f, 1.0f, 1.0f});
+        shader.setVec3("dirLight.direction", {-1.0f, -1.0f, -1.0f});
+        // 其他点光源
+        shader.setVec3("pointLights[0].ambient", {0.2f, 0.2f, 0.2f});
+        shader.setVec3("pointLights[0].diffuse", {0.5f, 0.5f, 0.5f});
+        shader.setVec3("pointLights[0].specular", {1.0f, 1.0f, 1.0f});
+        shader.setVec3("pointLights[0].position", lightPositions[0]);
+
+        shader.setFloat("pointLights[0].constant", 1.0f);
+        shader.setFloat("pointLights[0].linear", 0.09f);
+        shader.setFloat("pointLights[0].quadratic", 0.032f);
+
+        shader.setVec3("pointLights[1].ambient", {0.2f, 0.2f, 0.2f});
+        shader.setVec3("pointLights[1].diffuse", {0.5f, 0.5f, 0.5f});
+        shader.setVec3("pointLights[1].specular", {1.0f, 1.0f, 1.0f});
+        shader.setVec3("pointLights[1].position", lightPositions[1]);
+
+        shader.setFloat("pointLights[1].constant", 1.0f);
+        shader.setFloat("pointLights[1].linear", 0.09f);
+        shader.setFloat("pointLights[1].quadratic", 0.032f);
+
+        shader.setVec3("pointLights[2].ambient", {0.2f, 0.2f, 0.2f});
+        shader.setVec3("pointLights[2].diffuse", {0.5f, 0.5f, 0.5f});
+        shader.setVec3("pointLights[2].specular", {1.0f, 1.0f, 1.0f});
+        shader.setVec3("pointLights[2].position", lightPositions[2]);
+
+        shader.setFloat("pointLights[2].constant", 1.0f);
+        shader.setFloat("pointLights[2].linear", 0.09f);
+        shader.setFloat("pointLights[2].quadratic", 0.032f);
+
+        shader.setVec3("pointLights[3].ambient", {0.2f, 0.2f, 0.2f});
+        shader.setVec3("pointLights[3].diffuse", {0.5f, 0.5f, 0.5f});
+        shader.setVec3("pointLights[3].specular", {1.0f, 1.0f, 1.0f});
+        shader.setVec3("pointLights[3].position", lightPositions[3]);
+
+        shader.setFloat("pointLights[3].constant", 1.0f);
+        shader.setFloat("pointLights[3].linear", 0.09f);
+        shader.setFloat("pointLights[3].quadratic", 0.032f);
+        // shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
+        // shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
+        // float timeValue = glfwGetTime();
+        // float greenValue = sin(timeValue) / 2.0f + 0.5f;
+        // float redValue = cos(timeValue) / 2.0f + 0.5f;
+        // for (Mesh& mesh : meshes) {
+        //     if (mesh.name == "area_light")
+        //         shader.setVec3("objectColor", {1.0f, 1.0f, 1.0f});
+        //     else if (mesh.name == "left_wall")
+        //         shader.setVec3("objectColor", {redValue, 0.05, 0.05});
+        //     else if (mesh.name == "right_wall")
+        //         shader.setVec3("objectColor", {0.0, greenValue, 0.0});
+        //     else 
+        //         shader.setVec3("objectColor", {0.76, 0.69, 0.57});
+        //     mesh.draw();
+        // }
+        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        for (int i=0; i<10; i++) {
+            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+            Mat4 model = positions[i] * rotateMat;
+            shader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
         }
+
+        lightShader.use();
+        // lightShader.setMat4("model", lightModel);
+        lightShader.setMat4("view", view);
+        lightShader.setMat4("projection", proj);
+        lightShader.setVec3("LightColor", {1.0f, 1.0f, 1.0f});
+
+        for (int i=0; i<4; i++) {
+            lightShader.setMat4("model", lightModels[i]);
+            glBindVertexArray(lightVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        
+        // glfwSwapBuffers函数会交换颜色缓冲（它是一个储存着GLFW窗口每一个像素颜色值的大缓冲），它在这一迭代中被用来绘制，并且将会作为输出显示在屏幕上。
         glfwSwapBuffers(window);
+        // glfwPollEvents函数检查有没有触发什么事件（比如键盘输入、鼠标移动等）、更新窗口状态，并调用对应的回调函数
         glfwPollEvents();
     }
-
+    // 释放/删除之前的分配的所有资源
     glfwTerminate();
 }

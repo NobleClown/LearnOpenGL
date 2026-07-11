@@ -11,3 +11,10 @@
 ## 光线追踪
 
 ![](./doc/光线追踪.png)
+
+
+## Acknowledge
+
+1. glad
+2. opengl
+3. stb_image.h
