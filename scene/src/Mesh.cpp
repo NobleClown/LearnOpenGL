@@ -1,8 +1,6 @@
 #include "../include/Mesh.h"
 
 void Mesh::uploadToGPU() {
-    // vertexCnt = m_verticies.size();
-    // indexCnt = m_indices.size();
 
     // 创建VAO，用于解释Vertex数据
     glGenVertexArrays(1, &VAO);
@@ -41,33 +39,29 @@ Mesh::Mesh(const std::vector<Vertex>& verticies, const std::vector<unsigned int>
 }
 
 Mesh::~Mesh() {
-    if (VAO != 0) {
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
+    // if (VAO != 0) {
+    //     glDeleteVertexArrays(1, &VAO);
+    //     glDeleteBuffers(1, &VBO);
+    // }
+}
+
+void Mesh::Draw(const Shader& shader) {
+    unsigned int diffuseNr = 1;
+    unsigned int specularNr = 1;
+    for (unsigned int i=0; i<m_textures.size(); i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        std::string number;
+        std::string name = m_textures[i].type;
+        if (name == "texture_diffuse")
+            number = std::to_string(diffuseNr++);
+        else if (name == "texture_specular")
+            number = std::to_string(specularNr++);
+        shader.setInt("material." + name + number, i);
+        glBindTexture(GL_TEXTURE_2D, m_textures[i].id);
     }
-}
 
-void Mesh::draw() const {
+    glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(VAO);
-    // glDrawArrays(GL_TRIANGLES, 0, vertexCnt);
-    glDrawElements(GL_TRIANGLES, indexCnt, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
 }
-
-// std::vector<Triangle> Mesh::getTriangles() const {
-//     std::vector<Triangle> all_tri;
-
-//     return all_tri;
-// }
-
-// AABB Mesh::getAABB() const {
-//     AABB box;
-//     for (const Vertex& v : m_verticies) {
-//         box.x_max = std::max(box.x_max, v.position.x);
-//         box.x_min = std::min(box.x_min, v.position.x);
-//         box.y_max = std::max(box.y_max, v.position.y);
-//         box.y_min = std::min(box.y_min, v.position.y);
-//         box.z_max = std::max(box.z_max, v.position.z);
-//         box.z_min = std::min(box.z_min, v.position.z);
-//     }
-//     return box;
-// }

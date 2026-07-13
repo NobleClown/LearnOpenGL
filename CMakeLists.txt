@@ -9,7 +9,7 @@ add_executable(OpenGLEngine
     shaders/src/Shader.cpp
     scene/src/Mesh.cpp
     scene/src/Model.cpp
-    scene/src/Texture.cpp
+    # scene/src/Texture.cpp
     scene/src/Camera.cpp
     mathtool/src/MathType.cpp
     external/stb_image/src/stb_image_impl.cpp
@@ -25,6 +25,7 @@ target_include_directories(OpenGLEngine PRIVATE
 
 target_link_directories(OpenGLEngine PRIVATE
     external/glfw/lib
+    external/assimp/lib
 )
 
 target_compile_definitions(OpenGLEngine PRIVATE GLFW_STATIC)
@@ -32,4 +33,5 @@ target_compile_definitions(OpenGLEngine PRIVATE GLFW_STATIC)
 target_link_libraries(OpenGLEngine PRIVATE
     glfw3
     opengl32
+    assimp-vc143-mtd
 )

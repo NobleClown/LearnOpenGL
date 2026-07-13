@@ -77,7 +77,7 @@ void Shader::setVec3(const std::string& name, const Vec3& vec) {
     glUniform3f(loc, vec.x, vec.y, vec.z);
 }
 
-void Shader::setInt(const std::string& name, const int value) {
+void Shader::setInt(const std::string& name, const int value) const {
     int loc = glGetUniformLocation(programID, name.c_str());
     glUniform1i(loc, value);
 }

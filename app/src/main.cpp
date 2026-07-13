@@ -88,14 +88,7 @@ int main() {
 
     Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader");
     Shader lightShader("../../shaders/vertexshaders/light.shader", "../../shaders/fragmentshaders/light.shader");
-
-    // Model connelBox;
-    // connelBox.LoadOBJ("../../assets/ConnelBox.obj");
-    // std::vector<Mesh> meshes = connelBox.GetMeshes();
-
-    // Mat4 view = Mat4::getViewMat({0, 0, -20}, {0.f, 0.f, 0.f}, {0, 1, 0});
-    // Mat4 model = Mat4::getRotateMat({55.f, 0.f, 0.f});
-    // Mat4 model = Mat4::identity();
+    Shader singleColorShader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/singleColor.shader");
 
     Camera cam;
     cam.position = {0.f, 0.f, 3.f};
@@ -107,6 +100,7 @@ int main() {
     cam.farPlane = 100.f;
     cam.speed = 0.05f;
 
+    Model model("../../assets/backpack/backpack.obj");
     float vertices[] = {
         -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
          0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
@@ -150,18 +144,17 @@ int main() {
         -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
         -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f
     };
-
     Mat4 positions[] = {
-        Mat4::getTranslateMat({0.f, 0.f, 0.f}),
-        Mat4::getTranslateMat({2.f, 5.f, -15.f}),
         Mat4::getTranslateMat({-1.5f, -2.2f, -2.5f}),
-        Mat4::getTranslateMat({-3.8f, -2.0f, -12.3f}),
-        Mat4::getTranslateMat({2.4f, -0.4f, -3.5f}),
-        Mat4::getTranslateMat({-1.7f,  3.0f, -7.5f}),
-        Mat4::getTranslateMat({1.3f, -2.0f, -2.5f}),
-        Mat4::getTranslateMat({1.5f,  2.0f, -2.5f}),
-        Mat4::getTranslateMat({1.5f,  0.2f, -1.5f}),
         Mat4::getTranslateMat({-1.3f,  1.0f, -1.5f}),
+    };
+
+    std::vector<Vec3> vegetation = {
+        {-1.5f, 0.0f, -0.48f},
+        { 1.5f, 0.0f,  0.51f},
+        { 0.0f, 0.0f,  0.7f},
+        {-0.3f, 0.0f, -2.3f},
+        { 0.5f, 0.0f, -0.6f},
     };
 
     Vec3 lightPositions[] = {
@@ -171,57 +164,19 @@ int main() {
         {0.0f,  0.0f, -3.0f}
     };
 
-    // unsigned int indices[] = {0, 1, 2, 0, 2, 3};
-
-    unsigned int VAO, VBO, EBO;
-
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-
-    // 创建VBO，用于存储VertexBuffer数据
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    unsigned int lightVAO, lightVBO;
+    glGenBuffers(1, &lightVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
     glBufferData(GL_ARRAY_BUFFER, 36 * 8 * 4, vertices, GL_STATIC_DRAW);
-
-    // 创建EBO，用于存储indexbuffer数据
-    // glGenBuffers(1, &EBO);
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 32, (void*)12);
-    glEnableVertexAttribArray(1);
-
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, (void*)24);
-    glEnableVertexAttribArray(2);
-
-    // glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, (void*)(6 * 4));
-    // glEnableVertexAttribArray(2);
-    glBindVertexArray(0);
-
-    unsigned int lightVAO;
     glGenVertexArrays(1, &lightVAO);
     glBindVertexArray(lightVAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, (void*)0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
-
-    // glfwWindowHint(GLFW_DEPTH_BITS, 24);
     glEnable(GL_DEPTH_TEST);
-    // glDepthFunc(GL_LESS);
-    // glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK);
-    // for (Mesh& mesh : meshes) {
-    //     mesh.uploadToGPU();
-    // }
-
-    Texture t_box, t_spec;
-    t_box.loadTexture("../../assets/container2.png", 0);
-    t_spec.loadTexture("../../assets/matrix.jpg", 1);
+    glEnable(GL_STENCIL_TEST);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouseCallback);
@@ -242,13 +197,8 @@ int main() {
     // glfwWindowShouldClose检查一次GLFW是否被要求退出，是就返回true，就停止循环，然后可以关闭应用程序
     while (!glfwWindowShouldClose(window)) {
         glClearColor(0.5f, 0.5f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // t1.setTexture();
-        glBindVertexArray(VAO);
-        // float radius = 10.f;
-        // float camX = sin(glfwGetTime()) * radius;
-        // float camZ = cos(glfwGetTime()) * radius;
-        // Mat4 view = Mat4::getViewMat({camX, 0, camZ}, {0.f, 0.f, 0.f}, {0, 1, 0});
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        
         float currentFrame = glfwGetTime();
         deltatime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -259,8 +209,8 @@ int main() {
         Mat4 view = cam.getViewMat();
         Mat4 proj = cam.getProjectionMat();
         shader.use();
-        shader.setInt("material.diffuse", 0);
-        shader.setInt("material.specular", 1);
+        // shader.setInt("material.diffuse", 0);
+        // shader.setInt("material.specular", 1);
 
         float curTime = glfwGetTime();
         // shader.setVec3("lightColor", {sin(curTime * 2.0f), sin(curTime * 0.3f), sin(curTime * 1.7f)});
@@ -301,56 +251,60 @@ int main() {
         shader.setFloat("pointLights[0].linear", 0.09f);
         shader.setFloat("pointLights[0].quadratic", 0.032f);
 
-        shader.setVec3("pointLights[1].ambient", {0.2f, 0.2f, 0.2f});
-        shader.setVec3("pointLights[1].diffuse", {0.5f, 0.5f, 0.5f});
-        shader.setVec3("pointLights[1].specular", {1.0f, 1.0f, 1.0f});
-        shader.setVec3("pointLights[1].position", lightPositions[1]);
+        // shader.setVec3("pointLights[1].ambient", {0.2f, 0.2f, 0.2f});
+        // shader.setVec3("pointLights[1].diffuse", {0.5f, 0.5f, 0.5f});
+        // shader.setVec3("pointLights[1].specular", {1.0f, 1.0f, 1.0f});
+        // shader.setVec3("pointLights[1].position", lightPositions[1]);
 
-        shader.setFloat("pointLights[1].constant", 1.0f);
-        shader.setFloat("pointLights[1].linear", 0.09f);
-        shader.setFloat("pointLights[1].quadratic", 0.032f);
+        // shader.setFloat("pointLights[1].constant", 1.0f);
+        // shader.setFloat("pointLights[1].linear", 0.09f);
+        // shader.setFloat("pointLights[1].quadratic", 0.032f);
 
-        shader.setVec3("pointLights[2].ambient", {0.2f, 0.2f, 0.2f});
-        shader.setVec3("pointLights[2].diffuse", {0.5f, 0.5f, 0.5f});
-        shader.setVec3("pointLights[2].specular", {1.0f, 1.0f, 1.0f});
-        shader.setVec3("pointLights[2].position", lightPositions[2]);
+        // shader.setVec3("pointLights[2].ambient", {0.2f, 0.2f, 0.2f});
+        // shader.setVec3("pointLights[2].diffuse", {0.5f, 0.5f, 0.5f});
+        // shader.setVec3("pointLights[2].specular", {1.0f, 1.0f, 1.0f});
+        // shader.setVec3("pointLights[2].position", lightPositions[2]);
 
-        shader.setFloat("pointLights[2].constant", 1.0f);
-        shader.setFloat("pointLights[2].linear", 0.09f);
-        shader.setFloat("pointLights[2].quadratic", 0.032f);
+        // shader.setFloat("pointLights[2].constant", 1.0f);
+        // shader.setFloat("pointLights[2].linear", 0.09f);
+        // shader.setFloat("pointLights[2].quadratic", 0.032f);
 
-        shader.setVec3("pointLights[3].ambient", {0.2f, 0.2f, 0.2f});
-        shader.setVec3("pointLights[3].diffuse", {0.5f, 0.5f, 0.5f});
-        shader.setVec3("pointLights[3].specular", {1.0f, 1.0f, 1.0f});
-        shader.setVec3("pointLights[3].position", lightPositions[3]);
+        // shader.setVec3("pointLights[3].ambient", {0.2f, 0.2f, 0.2f});
+        // shader.setVec3("pointLights[3].diffuse", {0.5f, 0.5f, 0.5f});
+        // shader.setVec3("pointLights[3].specular", {1.0f, 1.0f, 1.0f});
+        // shader.setVec3("pointLights[3].position", lightPositions[3]);
 
-        shader.setFloat("pointLights[3].constant", 1.0f);
-        shader.setFloat("pointLights[3].linear", 0.09f);
-        shader.setFloat("pointLights[3].quadratic", 0.032f);
-        // shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
-        // shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
-        // float timeValue = glfwGetTime();
-        // float greenValue = sin(timeValue) / 2.0f + 0.5f;
-        // float redValue = cos(timeValue) / 2.0f + 0.5f;
-        // for (Mesh& mesh : meshes) {
-        //     if (mesh.name == "area_light")
-        //         shader.setVec3("objectColor", {1.0f, 1.0f, 1.0f});
-        //     else if (mesh.name == "left_wall")
-        //         shader.setVec3("objectColor", {redValue, 0.05, 0.05});
-        //     else if (mesh.name == "right_wall")
-        //         shader.setVec3("objectColor", {0.0, greenValue, 0.0});
-        //     else 
-        //         shader.setVec3("objectColor", {0.76, 0.69, 0.57});
-        //     mesh.draw();
-        // }
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        for (int i=0; i<10; i++) {
+        // shader.setFloat("pointLights[3].constant", 1.0f);
+        // shader.setFloat("pointLights[3].linear", 0.09f);
+        // shader.setFloat("pointLights[3].quadratic", 0.032f);
+
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glStencilFunc(GL_ALWAYS, 1, 0xff);
+        glStencilMask(0xFF);
+        for (int i=0; i<2; i++) {
             Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
-            Mat4 model = positions[i] * rotateMat;
-            shader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            Mat4 modelMat = positions[i] * rotateMat;
+            shader.setMat4("model", modelMat);
+            model.Draw(shader);
+            // glDrawArrays(GL_TRIANGLES, 0, 36);
         }
 
+        glStencilFunc(GL_NOTEQUAL, 1, 0xff);
+        glStencilMask(0x00);
+        glDisable(GL_DEPTH_TEST);
+        singleColorShader.use();
+        singleColorShader.setMat4("view", view);
+        singleColorShader.setMat4("projection", proj);
+        for (int i=0; i<2; i++) {
+            Mat4 scaleMat = Mat4::getScaleMat({1.1, 1.1, 1.1});
+            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+            Mat4 modelMat = positions[i] * rotateMat * scaleMat;
+            singleColorShader.setMat4("model", modelMat);
+            model.Draw(singleColorShader);
+        }
+
+        glStencilMask(0xff);
+        glEnable(GL_DEPTH_TEST);
         lightShader.use();
         // lightShader.setMat4("model", lightModel);
         lightShader.setMat4("view", view);
