@@ -21,7 +21,7 @@ void Texture::loadTexture(const char* path, const int texCnt) {
     if (m_nrChannels == 3)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     else if (m_nrChannels == 4)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     // 根据当前纹理，生成mipmap
     glGenerateMipmap(GL_TEXTURE_2D);
     // glBindTexture(GL_TEXTURE_2D, 0);

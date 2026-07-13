@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <cmath>
+#include <map>
 
 #include "../../shaders/include/Shader.h"
 #include "../../scene/include/Mesh.h"
@@ -88,6 +89,7 @@ int main() {
 
     Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader");
     Shader lightShader("../../shaders/vertexshaders/light.shader", "../../shaders/fragmentshaders/light.shader");
+    Shader windowShader("../../shaders/vertexshaders/window.shader", "../../shaders/fragmentshaders/window.shader");
 
     // Model connelBox;
     // connelBox.LoadOBJ("../../assets/ConnelBox.obj");
@@ -151,6 +153,24 @@ int main() {
         -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f
     };
 
+    float planeVertices[] = {
+         5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
+        -5.0f, -0.5f,  5.0f,  0.0f, 0.0f,
+        -5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
+
+         5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
+        -5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
+         5.0f, -0.5f, -5.0f,  2.0f, 2.0f
+    };
+
+    Vec3 planePositions[] = {
+        {-1.5f, 0.0f, -0.48f},
+        { 1.5f, 0.1f,  0.51f},
+        { 0.0f, 0.2f,  0.7f},
+        {-0.3f, 0.3f, -2.3f},
+        { 0.5f, 0.4f, -0.6f},
+    };
+
     Mat4 positions[] = {
         Mat4::getTranslateMat({0.f, 0.f, 0.f}),
         Mat4::getTranslateMat({2.f, 5.f, -15.f}),
@@ -210,8 +230,26 @@ int main() {
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
 
+    unsigned int windowVAO, windowVBO;
+
+    glGenVertexArrays(1, &windowVAO);
+    glBindVertexArray(windowVAO);
+
+    glGenBuffers(1, &windowVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, windowVBO);
+    glBufferData(GL_ARRAY_BUFFER, 6 * 5 * 4, planeVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 20, (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 20, (void*)12);
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+
     // glfwWindowHint(GLFW_DEPTH_BITS, 24);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // glDepthFunc(GL_LESS);
     // glEnable(GL_CULL_FACE);
     // glCullFace(GL_BACK);
@@ -219,9 +257,10 @@ int main() {
     //     mesh.uploadToGPU();
     // }
 
-    Texture t_box, t_spec;
+    Texture t_box, t_spec, t_window;
     t_box.loadTexture("../../assets/container2.png", 0);
     t_spec.loadTexture("../../assets/matrix.jpg", 1);
+    t_window.loadTexture("../../assets/blending_transparent_window.png", 2);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouseCallback);
@@ -236,6 +275,14 @@ int main() {
         Mat4::getTranslateMat(lightPositions[1]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
         Mat4::getTranslateMat(lightPositions[2]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
         Mat4::getTranslateMat(lightPositions[3]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
+    };
+
+    Mat4 windowModels[] = {
+        Mat4::getTranslateMat(planePositions[0]),
+        Mat4::getTranslateMat(planePositions[1]),
+        Mat4::getTranslateMat(planePositions[2]),
+        Mat4::getTranslateMat(planePositions[3]),
+        Mat4::getTranslateMat(planePositions[4]),
     };
 
 
@@ -361,6 +408,23 @@ int main() {
             lightShader.setMat4("model", lightModels[i]);
             glBindVertexArray(lightVAO);
             glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
+        windowShader.use();
+        windowShader.setMat4("view", view);
+        windowShader.setMat4("projection", proj);
+        windowShader.setInt("textureWindow", 2);
+
+        std::map<float, Mat4> sortedPosition;
+        for (int i=0; i<5; i++) {
+            float distance = (cam.position - planePositions[i]).getMagnitude();
+            sortedPosition[distance] = windowModels[i];
+        }
+
+        for (auto it=sortedPosition.rbegin(); it!=sortedPosition.rend(); it++) {
+            windowShader.setMat4("model", it->second);
+            glBindVertexArray(windowVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
         }
         
         // glfwSwapBuffers函数会交换颜色缓冲（它是一个储存着GLFW窗口每一个像素颜色值的大缓冲），它在这一迭代中被用来绘制，并且将会作为输出显示在屏幕上。
