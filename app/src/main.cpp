@@ -94,6 +94,25 @@ int main() {
     Shader skyboxShader("../../shaders/vertexshaders/skybox.shader", "../../shaders/fragmentshaders/skybox.shader");
     Shader reflectShader("../../shaders/vertexshaders/reflect.shader", "../../shaders/fragmentshaders/reflect.shader");
 
+    unsigned int uniformBlockIndexShader = glGetUniformBlockIndex(shader.getProgramID(), "Matrices");
+    unsigned int uniformBlockIndexLightShader = glGetUniformBlockIndex(lightShader.getProgramID(), "Matrices");
+    unsigned int uniformBlockIndexWindowShader = glGetUniformBlockIndex(windowShader.getProgramID(), "Matrices");
+    unsigned int uniformBlockIndexReflectShader = glGetUniformBlockIndex(reflectShader.getProgramID(), "Matrices");
+
+    glUniformBlockBinding(shader.getProgramID(), uniformBlockIndexShader, 0);
+    glUniformBlockBinding(lightShader.getProgramID(), uniformBlockIndexLightShader, 0);
+    glUniformBlockBinding(windowShader.getProgramID(), uniformBlockIndexWindowShader, 0);
+    glUniformBlockBinding(reflectShader.getProgramID(), uniformBlockIndexReflectShader, 0);
+
+    unsigned int uboMatrices;
+    glGenBuffers(1, & uboMatrices);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+    glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(Mat4), NULL, GL_STATIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(Mat4));
+
     // Model connelBox;
     // connelBox.LoadOBJ("../../assets/ConnelBox.obj");
     // std::vector<Mesh> meshes = connelBox.GetMeshes();
@@ -323,6 +342,7 @@ int main() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
+    glEnable(GL_PROGRAM_POINT_SIZE);
     glCullFace(GL_BACK);
     // for (Mesh& mesh : meshes) {
     //     mesh.uploadToGPU();
@@ -430,6 +450,11 @@ int main() {
         viewSkybox.set(1, 3, 0);
         viewSkybox.set(2, 3, 0);
         Mat4 proj = cam.getProjectionMat();
+        
+        glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Mat4), (void *)(proj.m));
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Mat4), sizeof(Mat4), (void *)(view.m));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
         glBindVertexArray(VAO);
         shader.use();
@@ -440,8 +465,8 @@ int main() {
         // shader.setVec3("lightColor", {sin(curTime * 2.0f), sin(curTime * 0.3f), sin(curTime * 1.7f)});
         shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
         // shader.setMat4("model", model);
-        shader.setMat4("view", view);
-        shader.setMat4("projection", proj);
+        // shader.setMat4("view", view);
+        // shader.setMat4("projection", proj);
         shader.setVec3("cameraPos", cam.position);
 
         shader.setVec3("material.ambient", {1.0f, 0.5f, 0.31f});
@@ -505,8 +530,8 @@ int main() {
         reflectShader.use();
         reflectShader.setInt("skybox", 4);
         reflectShader.setVec3("camPos", cam.position);
-        reflectShader.setMat4("projection", proj);
-        reflectShader.setMat4("view", view);
+        // reflectShader.setMat4("projection", proj);
+        // reflectShader.setMat4("view", view);
         // shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
         // shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
         // float timeValue = glfwGetTime();
@@ -534,8 +559,8 @@ int main() {
 
         lightShader.use();
         // lightShader.setMat4("model", lightModel);
-        lightShader.setMat4("view", view);
-        lightShader.setMat4("projection", proj);
+        // lightShader.setMat4("view", view);
+        // lightShader.setMat4("projection", proj);
         lightShader.setVec3("LightColor", {1.0f, 1.0f, 1.0f});
 
         for (int i=0; i<4; i++) {
@@ -545,8 +570,8 @@ int main() {
         }
 
         windowShader.use();
-        windowShader.setMat4("view", view);
-        windowShader.setMat4("projection", proj);
+        // windowShader.setMat4("view", view);
+        // windowShader.setMat4("projection", proj);
         windowShader.setInt("textureWindow", 2);
 
         std::map<float, Mat4> sortedPosition;
