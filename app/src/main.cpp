@@ -87,14 +87,29 @@ int main() {
     // glad 用于管理opengl函数指针，调用opengl函数前需要初始化函数指针
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader", "../../shaders/geometryshaders/simple.shader");
+    Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader");
 
     float points[] = {
-        -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, // 左上
-         0.5f,  0.5f, 0.0f, 1.0f, 0.0f, // 右上
-         0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // 右下
-        -0.5f, -0.5f, 1.0f, 1.0f, 0.0f  // 左下
+        -0.05f,  0.05f,  1.0f, 0.0f, 0.0f,
+         0.05f, -0.05f,  0.0f, 1.0f, 0.0f,
+        -0.05f, -0.05f,  0.0f, 0.0f, 1.0f,
+
+        -0.05f,  0.05f,  1.0f, 0.0f, 0.0f,
+         0.05f, -0.05f,  0.0f, 1.0f, 0.0f,   
+         0.05f,  0.05f,  0.0f, 1.0f, 1.0f  
     };
+
+    Vec2 translations[100];
+    int index = 0;
+    float offset = 0.1f;
+    for (int y=-10; y<10; y+=2) {
+        for (int x=-10; x<10; x+=2) {
+            Vec2 translation;
+            translation.x = (float)x / 10.f + offset;
+            translation.y = (float)y / 10.f + offset;
+            translations[index++] = translation;
+        }
+    }
 
     unsigned int VAO, VBO, EBO;
 
@@ -104,7 +119,7 @@ int main() {
     // 创建VBO，用于存储VertexBuffer数据
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 4 * 5 * 4, points, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 6 * 5 * 4, points, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 20, (void*)0);
     glEnableVertexAttribArray(0);
@@ -126,7 +141,10 @@ int main() {
 
         glBindVertexArray(VAO);
         shader.use();
-        glDrawArrays(GL_POINTS, 0, 4);
+        for (int i=0; i<100; i++)
+            shader.setVec2("offsets[" + std::to_string(i) + "]", translations[i]);
+        // glDrawArrays(GL_POINTS, 0, 4);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 100);
         
         // glfwSwapBuffers函数会交换颜色缓冲（它是一个储存着GLFW窗口每一个像素颜色值的大缓冲），它在这一迭代中被用来绘制，并且将会作为输出显示在屏幕上。
         glfwSwapBuffers(window);

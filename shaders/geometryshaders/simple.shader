@@ -10,13 +10,12 @@ in VS_OUT {
 out vec3 fColor;
 
 void build_house(vec4 position) {
-    vec2 offsets[] = {
-        vec2(-0.2, -0.2),
-        vec2( 0.2, -0.2),
-        vec2(-0.2,  0.2),
-        vec2( 0.2,  0.2),
-        vec2( 0.0,  0.4),
-    };
+    vec2 offsets[5];
+    offsets[0] = vec2(-0.2, -0.2);
+    offsets[0] = vec2( 0.2, -0.2);
+    offsets[0] = vec2(-0.2,  0.2);
+    offsets[0] = vec2( 0.2,  0.2);
+    offsets[0] = vec2( 0.0,  0.4);
 
     for (int i=0; i<5; i++) {
         gl_Position = position + vec4(offsets[i].xy, 0.0, 0.0);

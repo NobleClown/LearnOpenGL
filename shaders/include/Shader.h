@@ -20,6 +20,7 @@ public:
     void setFloat(const std::string& name, float value);
     void setMat4(const std::string& name, const Mat4& mat);
     void setVec3(const std::string& name, const Vec3& vec);
+    void setVec2(const std::string& name, const Vec2& vec);
 private:
     unsigned int programID;
 
