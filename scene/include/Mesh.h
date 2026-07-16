@@ -16,6 +16,8 @@ public:
     std::vector<uint32_t> m_indices;
     std::vector<Texture> m_textures;
     void Draw(const Shader& shader);
+    void DrawInstances(const Shader& shader, unsigned int amount);
+    unsigned int getVAO() { return VAO; }
     ~Mesh();
 
 private:

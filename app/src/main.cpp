@@ -79,6 +79,9 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+    // 指示每个屏幕坐标使用4个采样点的颜色缓冲
+    glfwWindowHint(GLFW_SAMPLES, 4);
+
     // 创建窗口
     GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -90,6 +93,8 @@ int main() {
     Shader normalShader("../../shaders/vertexshaders/normal.shader", "../../shaders/fragmentshaders/normal.shader", "../../shaders/geometryshaders/normal.shader");
     Shader lightShader("../../shaders/vertexshaders/light.shader", "../../shaders/fragmentshaders/light.shader");
     Shader singleColorShader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/singleColor.shader");
+    Shader planetShader("../../shaders/vertexshaders/planet.shader", "../../shaders/fragmentshaders/planet.shader");
+    Shader rockShader("../../shaders/vertexshaders/rock.shader", "../../shaders/fragmentshaders/rock.shader");
 
     Camera cam;
     cam.position = {0.f, 0.f, 3.f};
@@ -102,6 +107,8 @@ int main() {
     cam.speed = 0.05f;
 
     Model model("../../assets/backpack/backpack.obj");
+    Model planet("../../assets/planet/planet.obj");
+    Model rock("../../assets/rock/rock.obj");
     float vertices[] = {
         -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
          0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
@@ -178,6 +185,7 @@ int main() {
     glBindVertexArray(0);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_STENCIL_TEST);
+    glEnable(GL_MULTISAMPLE);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouseCallback);
@@ -194,10 +202,57 @@ int main() {
         Mat4::getTranslateMat(lightPositions[3]) * Mat4::getScaleMat({0.2f, 0.2f, 0.2f}),
     };
 
+    unsigned int amount = 12000;
+    std::vector<Mat4> rockModelMatrixes(amount);
+    srand(glfwGetTime());
+    float radius = 25.f;
+    float offset = 10.f;
+    for (unsigned int i=0; i<amount; i++) {
+        // 位移
+        float angle = (float)i / (float)amount * 360.f;
+        float displacement = (rand() % (int)(2 * offset * 100)) / 100.f - offset;
+        float x = std::sin(angle) * radius + displacement;
+        displacement = (rand() % (int)(2 * offset * 100)) / 100.f - offset;
+        float y = displacement * 0.4;
+        displacement = (rand() % (int)(2 * offset * 100)) / 100.f - offset;
+        float z = cos(angle) * radius + displacement;
+        // 缩放
+        float scale = (rand() % 20) / 100.f + 0.05;
+        // 旋转
+        float rotAngle = (rand() % 20) / 100.f + 0.05;
+        Mat4 rockModel = Mat4::getTranslateMat({x, y, z}) * Mat4::getRotateMat({0.4f * rotAngle, 0.6f * rotAngle, 0.8f * rotAngle}) * Mat4::getScaleMat({scale, scale, scale});
+        rockModelMatrixes[i] = rockModel;
+    }
+
+    unsigned int buffer;
+    glGenBuffers(1, &buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER, amount * sizeof(Mat4), rockModelMatrixes.data(), GL_STATIC_DRAW);
+
+    std::vector<Mesh>& rockMeshes = rock.getMeshse();
+    for (unsigned int i=0; i<rockMeshes.size(); i++) {
+        glBindVertexArray(rockMeshes[i].getVAO());
+        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)0);
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)sizeof(Vec4));
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)(sizeof(Vec4) * 2));
+        glEnableVertexAttribArray(5);
+        glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(Vec4), (void*)(sizeof(Vec4) * 3));
+        glEnableVertexAttribArray(6);
+
+        glVertexAttribDivisor(3, 1);
+        glVertexAttribDivisor(4, 1);
+        glVertexAttribDivisor(5, 1);
+        glVertexAttribDivisor(6, 1);
+
+        glBindVertexArray(0);
+    }
+
 
     // glfwWindowShouldClose检查一次GLFW是否被要求退出，是就返回true，就停止循环，然后可以关闭应用程序
     while (!glfwWindowShouldClose(window)) {
-        glClearColor(0.5f, 0.5f, 0.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         
         float currentFrame = glfwGetTime();
@@ -215,44 +270,44 @@ int main() {
 
         float curTime = glfwGetTime();
         // shader.setVec3("lightColor", {sin(curTime * 2.0f), sin(curTime * 0.3f), sin(curTime * 1.7f)});
-        shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
-        // shader.setMat4("model", model);
-        shader.setMat4("view", view);
-        shader.setMat4("projection", proj);
-        shader.setVec3("cameraPos", cam.position);
+        // shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
+        // // shader.setMat4("model", model);
+        // shader.setMat4("view", view);
+        // shader.setMat4("projection", proj);
+        // shader.setVec3("cameraPos", cam.position);
 
-        shader.setFloat("time", currentFrame);
+        // shader.setFloat("time", currentFrame);
 
-        shader.setVec3("material.ambient", {1.0f, 0.5f, 0.31f});
-        shader.setVec3("material.diffuse", {1.0f, 0.5f, 0.31f});
-        // shader.setVec3("material.specular", {0.5f, 0.5f, 0.5f});
-        shader.setFloat("material.shininess", 32.0f);
-        // 聚光灯
-        shader.setVec3("spotLight.ambient", {0.2f, 0.2f, 0.2f});
-        shader.setVec3("spotLight.diffuse", {0.5f, 0.5f, 0.5f});
-        shader.setVec3("spotLight.specular", {1.0f, 1.0f, 1.0f});
-        shader.setVec3("spotLight.position", cam.position);
-        shader.setVec3("spotLight.direction", cam.forward);
-        shader.setFloat("spotLight.outterCutOff", cos(17.5 * PI / 180));
-        shader.setFloat("spotLight.cutOff", cos(12.5 * PI / 180));
+        // shader.setVec3("material.ambient", {1.0f, 0.5f, 0.31f});
+        // shader.setVec3("material.diffuse", {1.0f, 0.5f, 0.31f});
+        // // shader.setVec3("material.specular", {0.5f, 0.5f, 0.5f});
+        // shader.setFloat("material.shininess", 32.0f);
+        // // 聚光灯
+        // shader.setVec3("spotLight.ambient", {0.2f, 0.2f, 0.2f});
+        // shader.setVec3("spotLight.diffuse", {0.5f, 0.5f, 0.5f});
+        // shader.setVec3("spotLight.specular", {1.0f, 1.0f, 1.0f});
+        // shader.setVec3("spotLight.position", cam.position);
+        // shader.setVec3("spotLight.direction", cam.forward);
+        // shader.setFloat("spotLight.outterCutOff", cos(17.5 * PI / 180));
+        // shader.setFloat("spotLight.cutOff", cos(12.5 * PI / 180));
         
-        shader.setFloat("spotLight.constant", 1.0f);
-        shader.setFloat("spotLight.linear", 0.09f);
-        shader.setFloat("spotLight.quadratic", 0.032f);
-        // 平行光、太阳光
-        shader.setVec3("dirLight.ambient", {0.2f, 0.2f, 0.2f});
-        shader.setVec3("dirLight.diffuse", {0.5f, 0.5f, 0.5f});
-        shader.setVec3("dirLight.specular", {1.0f, 1.0f, 1.0f});
-        shader.setVec3("dirLight.direction", {-1.0f, -1.0f, -1.0f});
-        // 其他点光源
-        shader.setVec3("pointLights[0].ambient", {0.2f, 0.2f, 0.2f});
-        shader.setVec3("pointLights[0].diffuse", {0.5f, 0.5f, 0.5f});
-        shader.setVec3("pointLights[0].specular", {1.0f, 1.0f, 1.0f});
-        shader.setVec3("pointLights[0].position", lightPositions[0]);
+        // shader.setFloat("spotLight.constant", 1.0f);
+        // shader.setFloat("spotLight.linear", 0.09f);
+        // shader.setFloat("spotLight.quadratic", 0.032f);
+        // // 平行光、太阳光
+        // shader.setVec3("dirLight.ambient", {0.2f, 0.2f, 0.2f});
+        // shader.setVec3("dirLight.diffuse", {0.5f, 0.5f, 0.5f});
+        // shader.setVec3("dirLight.specular", {1.0f, 1.0f, 1.0f});
+        // shader.setVec3("dirLight.direction", {-1.0f, -1.0f, -1.0f});
+        // // 其他点光源
+        // shader.setVec3("pointLights[0].ambient", {0.2f, 0.2f, 0.2f});
+        // shader.setVec3("pointLights[0].diffuse", {0.5f, 0.5f, 0.5f});
+        // shader.setVec3("pointLights[0].specular", {1.0f, 1.0f, 1.0f});
+        // shader.setVec3("pointLights[0].position", lightPositions[0]);
 
-        shader.setFloat("pointLights[0].constant", 1.0f);
-        shader.setFloat("pointLights[0].linear", 0.09f);
-        shader.setFloat("pointLights[0].quadratic", 0.032f);
+        // shader.setFloat("pointLights[0].constant", 1.0f);
+        // shader.setFloat("pointLights[0].linear", 0.09f);
+        // shader.setFloat("pointLights[0].quadratic", 0.032f);
 
         // shader.setVec3("pointLights[1].ambient", {0.2f, 0.2f, 0.2f});
         // shader.setVec3("pointLights[1].diffuse", {0.5f, 0.5f, 0.5f});
@@ -281,56 +336,72 @@ int main() {
         // shader.setFloat("pointLights[3].linear", 0.09f);
         // shader.setFloat("pointLights[3].quadratic", 0.032f);
 
-        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-        glStencilFunc(GL_ALWAYS, 1, 0xff);
-        glStencilMask(0xFF);
-        for (int i=0; i<2; i++) {
-            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
-            Mat4 modelMat = positions[i] * rotateMat;
-            shader.setMat4("model", modelMat);
-            model.Draw(shader);
-            // glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        // glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        // glStencilFunc(GL_ALWAYS, 1, 0xff);
+        // glStencilMask(0xFF);
+        // for (int i=0; i<2; i++) {
+        //     Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+        //     Mat4 modelMat = positions[i] * rotateMat;
+        //     shader.setMat4("model", modelMat);
+        //     model.Draw(shader);
+        //     // glDrawArrays(GL_TRIANGLES, 0, 36);
+        // }
 
-        glStencilFunc(GL_NOTEQUAL, 1, 0xff);
-        glStencilMask(0x00);
-        glDisable(GL_DEPTH_TEST);
-        singleColorShader.use();
-        singleColorShader.setMat4("view", view);
-        singleColorShader.setMat4("projection", proj);
-        for (int i=0; i<2; i++) {
-            Mat4 scaleMat = Mat4::getScaleMat({1.1, 1.1, 1.1});
-            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
-            Mat4 modelMat = positions[i] * rotateMat * scaleMat;
-            singleColorShader.setMat4("model", modelMat);
-            model.Draw(singleColorShader);
-        }
+        // glStencilFunc(GL_NOTEQUAL, 1, 0xff);
+        // glStencilMask(0x00);
+        // glDisable(GL_DEPTH_TEST);
+        // singleColorShader.use();
+        // singleColorShader.setMat4("view", view);
+        // singleColorShader.setMat4("projection", proj);
+        // for (int i=0; i<2; i++) {
+        //     Mat4 scaleMat = Mat4::getScaleMat({1.1, 1.1, 1.1});
+        //     Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+        //     Mat4 modelMat = positions[i] * rotateMat * scaleMat;
+        //     singleColorShader.setMat4("model", modelMat);
+        //     model.Draw(singleColorShader);
+        // }
 
-        glStencilMask(0xff);
-        glEnable(GL_DEPTH_TEST);
-        lightShader.use();
-        // lightShader.setMat4("model", lightModel);
-        lightShader.setMat4("view", view);
-        lightShader.setMat4("projection", proj);
-        lightShader.setVec3("LightColor", {1.0f, 1.0f, 1.0f});
+        // glStencilMask(0xff);
+        // glEnable(GL_DEPTH_TEST);
+        // lightShader.use();
+        // // lightShader.setMat4("model", lightModel);
+        // lightShader.setMat4("view", view);
+        // lightShader.setMat4("projection", proj);
+        // lightShader.setVec3("LightColor", {1.0f, 1.0f, 1.0f});
 
-        for (int i=0; i<4; i++) {
-            lightShader.setMat4("model", lightModels[i]);
-            glBindVertexArray(lightVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        // for (int i=0; i<4; i++) {
+        //     lightShader.setMat4("model", lightModels[i]);
+        //     glBindVertexArray(lightVAO);
+        //     glDrawArrays(GL_TRIANGLES, 0, 36);
+        // }
 
-        normalShader.use();
-        normalShader.setMat4("view", view);
-        normalShader.setMat4("projection", proj);
+        // normalShader.use();
+        // normalShader.setMat4("view", view);
+        // normalShader.setMat4("projection", proj);
 
-        for (int i=0; i<2; i++) {
-            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
-            Mat4 modelMat = positions[i] * rotateMat;
-            normalShader.setMat4("model", modelMat);
-            model.Draw(normalShader);
-            // glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        // for (int i=0; i<2; i++) {
+        //     Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+        //     Mat4 modelMat = positions[i] * rotateMat;
+        //     normalShader.setMat4("model", modelMat);
+        //     model.Draw(normalShader);
+        //     // glDrawArrays(GL_TRIANGLES, 0, 36);
+        // }
+
+        planetShader.use();
+        planetShader.setMat4("view", view);
+        planetShader.setMat4("projection", proj);
+        planetShader.setMat4("model", Mat4::getScaleMat({2.0, 2.0, 2.0}));
+        planet.Draw(planetShader);
+
+        rockShader.use();
+        rockShader.setMat4("view", view);
+        rockShader.setMat4("projection", proj);
+        rock.DrawInstances(rockShader, amount);
+        // for (int i=0; i<amount; i++) {
+        //     rockShader.setMat4("model", rockModelMatrixes[i]);
+        //     rock.Draw(rockShader);
+        // }
+        
         
         // glfwSwapBuffers函数会交换颜色缓冲（它是一个储存着GLFW窗口每一个像素颜色值的大缓冲），它在这一迭代中被用来绘制，并且将会作为输出显示在屏幕上。
         glfwSwapBuffers(window);

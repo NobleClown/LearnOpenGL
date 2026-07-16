@@ -25,6 +25,11 @@ void Model::Draw(const Shader& shader) {
         mesh.Draw(shader);
 }
 
+void Model::DrawInstances(const Shader& shader, unsigned int amount) {
+    for (Mesh mesh : m_meshes) 
+        mesh.DrawInstances(shader, amount);
+}
+
 void Model::processNode(aiNode* node, const aiScene* scene) {
     for (unsigned int i=0; i<node->mNumMeshes; i++) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];

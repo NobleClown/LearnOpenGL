@@ -16,6 +16,8 @@ class Model {
 public:
     Model(const std::string& path);
     void Draw(const Shader& shader);
+    void DrawInstances(const Shader& shader, unsigned int amount);
+    std::vector<Mesh>& getMeshse() { return m_meshes; }
 private:
     bool loadModel(const std::string& path);
     void processNode(aiNode* node, const aiScene* scene);
