@@ -8,6 +8,7 @@
 class Shader {
 public:
     Shader(const std::string& vsPath, const std::string& fsPath);
+    Shader(const std::string& vsPath, const std::string& fsPath, const std::string& gsPath);
     ~Shader();
 
     void use() const;
@@ -25,4 +26,6 @@ private:
     std::string loadFile(const std::string& path);
     unsigned int compile(GLenum type, const std::string& src);
     void link(unsigned int vs, unsigned int fs);
+    void link(unsigned int vs, unsigned int fs, unsigned int gs);
+    void checkLinkStatus() const;
 };
