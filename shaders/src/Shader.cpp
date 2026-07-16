@@ -17,6 +17,22 @@ Shader::Shader(const std::string& vsPath, const std::string& fsPath) {
     glDeleteShader(fs);
 }
 
+Shader::Shader(const std::string& vsPath, const std::string& fsPath, const std::string& gsPath) {
+    std::string vsCode = loadFile(vsPath);
+    std::string fsCode = loadFile(fsPath);
+    std::string gsCode = loadFile(gsPath);
+
+    unsigned int vs = compile(GL_VERTEX_SHADER, vsCode);
+    unsigned int fs = compile(GL_FRAGMENT_SHADER, fsCode);
+    unsigned int gs = compile(GL_GEOMETRY_SHADER, gsCode);
+
+    link(vs, fs, gs);
+
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    glDeleteShader(gs);
+}
+
 Shader::~Shader() {
     glDeleteProgram(programID);
 }
@@ -54,6 +70,21 @@ void Shader::link(unsigned int vs, unsigned int fs) {
 
     glLinkProgram(programID);
 
+    checkLinkStatus();
+}
+
+void Shader::link(unsigned int vs, unsigned int fs, unsigned int gs) {
+    programID = glCreateProgram();
+    glAttachShader(programID, vs);
+    glAttachShader(programID, fs);
+    glAttachShader(programID, gs);
+
+    glLinkProgram(programID);
+
+    checkLinkStatus();
+}
+
+void Shader::checkLinkStatus() const {
     int success;
     glGetProgramiv(programID, GL_LINK_STATUS, &success);
     if (!success) {
@@ -62,6 +93,7 @@ void Shader::link(unsigned int vs, unsigned int fs) {
         std::cout << "Program Link Error: \n" << log << std::endl;
     }
 }
+
 
 void Shader::use() const {
     glUseProgram(programID);

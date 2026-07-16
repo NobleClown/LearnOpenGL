@@ -86,7 +86,8 @@ int main() {
     // glad 用于管理opengl函数指针，调用opengl函数前需要初始化函数指针
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader");
+    Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader", "../../shaders/geometryshaders/simple.shader");
+    Shader normalShader("../../shaders/vertexshaders/normal.shader", "../../shaders/fragmentshaders/normal.shader", "../../shaders/geometryshaders/normal.shader");
     Shader lightShader("../../shaders/vertexshaders/light.shader", "../../shaders/fragmentshaders/light.shader");
     Shader singleColorShader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/singleColor.shader");
 
@@ -220,6 +221,8 @@ int main() {
         shader.setMat4("projection", proj);
         shader.setVec3("cameraPos", cam.position);
 
+        shader.setFloat("time", currentFrame);
+
         shader.setVec3("material.ambient", {1.0f, 0.5f, 0.31f});
         shader.setVec3("material.diffuse", {1.0f, 0.5f, 0.31f});
         // shader.setVec3("material.specular", {0.5f, 0.5f, 0.5f});
@@ -315,6 +318,18 @@ int main() {
             lightShader.setMat4("model", lightModels[i]);
             glBindVertexArray(lightVAO);
             glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
+        normalShader.use();
+        normalShader.setMat4("view", view);
+        normalShader.setMat4("projection", proj);
+
+        for (int i=0; i<2; i++) {
+            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+            Mat4 modelMat = positions[i] * rotateMat;
+            normalShader.setMat4("model", modelMat);
+            model.Draw(normalShader);
+            // glDrawArrays(GL_TRIANGLES, 0, 36);
         }
         
         // glfwSwapBuffers函数会交换颜色缓冲（它是一个储存着GLFW窗口每一个像素颜色值的大缓冲），它在这一迭代中被用来绘制，并且将会作为输出显示在屏幕上。
