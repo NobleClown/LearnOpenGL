@@ -44,18 +44,22 @@ struct PointLight {
 vec3 CalcDirLight(DirLigth light, vec3 normal, vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+float depthTest();
 
 in vec3 FragPos;
 in vec3 FragNormal;
 in vec2 TexCoord;
+in vec4 lightSpace;
 
 uniform vec3 lightColor;
+uniform vec3 lightPos;
 uniform vec3 cameraPos;
 uniform Material material;
 uniform SpotLight spotLight;
 uniform DirLigth dirLight;
 #define NR_POINT_LIGHTS 4
 uniform PointLight pointLights[NR_POINT_LIGHTS];
+uniform sampler2D shadowMap;
 
 out vec4 FragColor;
 
@@ -64,10 +68,11 @@ out vec4 FragColor;
 void main() {
     // 基础向量
     vec3 norm = normalize(FragNormal);
+    float inShadow = depthTest();
     vec3 viewDir = normalize(cameraPos - FragPos);
     vec3 result = CalcDirLight(dirLight, norm, viewDir);
     for (int i=0; i<NR_POINT_LIGHTS; i++) {
-        result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
+        result += (1.0 - inShadow) * CalcPointLight(pointLights[i], norm, FragPos, viewDir);
     }
 
     result += CalcSpotLight(spotLight, norm, FragPos, viewDir);
@@ -124,4 +129,21 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 specular = vec3(texture(material.specular, TexCoord)) * spec * light.specular * attenuation * intensity;
 
     return ambient + diffuse + specular;
+}
+
+float depthTest() {
+    vec3 projCoords = lightSpace.xyz / lightSpace.w * 0.5 + 0.5;
+    float shadow = 0.0;
+    float bias = max(0.05 * (1.0 - dot(normalize(FragNormal), normalize(lightPos - FragPos))), 0.005);
+    for (int x=-1; x<=1; x++) {
+        for (int y=-1; y<=1; y++) {
+            float curDepth = texture(shadowMap, projCoords.xy + vec2(x, y) / textureSize(shadowMap, 0)).r;
+            if (curDepth + bias < projCoords.z)
+                shadow += 1.0;
+        }
+    }
+    
+    if (projCoords.z > 1.0)
+        return 0.0;
+    return shadow / 9.0;
 }

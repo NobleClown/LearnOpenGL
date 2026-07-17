@@ -76,8 +76,8 @@ int main() {
     if (!glfwInit()) return -1;
 
     // 指定主次版本号、以及使用核心模式
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // 创建窗口
@@ -101,6 +101,7 @@ int main() {
     Shader screenShader("../../shaders/vertexshaders/screen.shader", "../../shaders/fragmentshaders/screen.shader");
     Shader skyboxShader("../../shaders/vertexshaders/skybox.shader", "../../shaders/fragmentshaders/skybox.shader");
     Shader reflectShader("../../shaders/vertexshaders/reflect.shader", "../../shaders/fragmentshaders/reflect.shader");
+    Shader shadowShader("../../shaders/vertexshaders/shadow.shader", "../../shaders/fragmentshaders/shadow.shader");
 
     unsigned int uniformBlockIndexShader = glGetUniformBlockIndex(shader.getProgramID(), "Matrices");
     unsigned int uniformBlockIndexLightShader = glGetUniformBlockIndex(lightShader.getProgramID(), "Matrices");
@@ -411,6 +412,42 @@ int main() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+
+    unsigned int depthMap;
+    glGenTextures(1, &depthMap);
+    glActiveTexture(GL_TEXTURE0 + 5);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = {1.0, 1.0, 1.0, 1.0};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glActiveTexture(GL_TEXTURE0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    Camera camLight;
+    camLight.position = {3.f, 3.f, 3.f};
+    camLight.forward = {-3.f, -3.f, -3.f};
+    camLight.up = {0.f, 1.f, 0.f};
+    camLight.fov = 60.f;
+    camLight.aspect = 1;
+    camLight.nearPlane = 1.0f;
+    camLight.farPlane = 10.5f;
+    camLight.speed = 0.05f;
+
+    Mat4 camLightVP = camLight.getProjectionMat() * camLight.getViewMat();
+    shadowShader.use();
+    shadowShader.setMat4("LightVP", camLightVP);
+
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetScrollCallback(window, scrollCallback);
@@ -445,6 +482,22 @@ int main() {
         // float camX = sin(glfwGetTime()) * radius;
         // float camZ = cos(glfwGetTime()) * radius;
         // Mat4 view = Mat4::getViewMat({camX, 0, camZ}, {0.f, 0.f, 0.f}, {0, 1, 0});
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glCullFace(GL_FRONT);
+        glViewport(0, 0, 1024, 1024);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(VAO);
+        shadowShader.use();
+        for (int i=0; i<10; i++) {
+            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+            Mat4 model = positions[i] * rotateMat;
+            shadowShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        glCullFace(GL_BACK);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, 800, 600);
+        
         float currentFrame = glfwGetTime();
         deltatime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -472,6 +525,9 @@ int main() {
         float curTime = glfwGetTime();
         // shader.setVec3("lightColor", {sin(curTime * 2.0f), sin(curTime * 0.3f), sin(curTime * 1.7f)});
         shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
+        shader.setMat4("LightVP", camLightVP);
+        shader.setVec3("lightPos", camLight.position);
+        shader.setInt("shadowMap", 5);
         // shader.setMat4("model", model);
         // shader.setMat4("view", view);
         // shader.setMat4("projection", proj);
@@ -535,13 +591,13 @@ int main() {
         shader.setFloat("pointLights[3].linear", 0.09f);
         shader.setFloat("pointLights[3].quadratic", 0.032f);
 
-        reflectShader.use();
-        reflectShader.setInt("skybox", 4);
-        reflectShader.setVec3("camPos", cam.position);
+        // reflectShader.use();
+        // reflectShader.setInt("skybox", 4);
+        // reflectShader.setVec3("camPos", cam.position);
         // reflectShader.setMat4("projection", proj);
         // reflectShader.setMat4("view", view);
-        // shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
-        // shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
+        shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
+        shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
         // float timeValue = glfwGetTime();
         // float greenValue = sin(timeValue) / 2.0f + 0.5f;
         // float redValue = cos(timeValue) / 2.0f + 0.5f;
@@ -560,8 +616,8 @@ int main() {
         for (int i=0; i<10; i++) {
             Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
             Mat4 model = positions[i] * rotateMat;
-            // shader.setMat4("model", model);
-            reflectShader.setMat4("model", model);
+            shader.setMat4("model", model);
+            // reflectShader.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
 
