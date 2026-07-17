@@ -7,11 +7,10 @@ out VS_OUT {
     vec3 color;
 } vs_out;
 
-uniform vec2 offsets[100];
+uniform mat4 model;
 
 void main() {
-    vec2 pos = aPos * (gl_InstanceID / 100.0);
-    vec2 offset = offsets[gl_InstanceID];
-    gl_Position = vec4(pos + offset, 0.0, 1.0);
+    vec2 pos = aPos;
+    gl_Position = model * vec4(pos, 0.0, 1.0);
     vs_out.color = aColor;
 }
