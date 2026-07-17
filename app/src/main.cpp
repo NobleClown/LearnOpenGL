@@ -87,6 +87,14 @@ int main() {
     // glad 用于管理opengl函数指针，调用opengl函数前需要初始化函数指针
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(
+        [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
+            std::cout << "OpenGL Error: " << message << std::endl;
+        },
+        nullptr
+    );
+
     Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader");
     Shader lightShader("../../shaders/vertexshaders/light.shader", "../../shaders/fragmentshaders/light.shader");
     Shader windowShader("../../shaders/vertexshaders/window.shader", "../../shaders/fragmentshaders/window.shader");
