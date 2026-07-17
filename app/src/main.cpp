@@ -75,8 +75,8 @@ int main() {
     if (!glfwInit()) return -1;
 
     // 指定主次版本号、以及使用核心模式
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // 指示每个屏幕坐标使用4个采样点的颜色缓冲
@@ -96,6 +96,8 @@ int main() {
         },
         nullptr
     );
+
+    glEnable(GL_FRAMEBUFFER_SRGB);
 
     Shader shader("../../shaders/vertexshaders/simple.shader", "../../shaders/fragmentshaders/simple.shader", "../../shaders/geometryshaders/simple.shader");
     Shader normalShader("../../shaders/vertexshaders/normal.shader", "../../shaders/fragmentshaders/normal.shader", "../../shaders/geometryshaders/normal.shader");
