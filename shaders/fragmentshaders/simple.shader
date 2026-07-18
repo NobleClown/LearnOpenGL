@@ -44,13 +44,13 @@ struct PointLight {
 vec3 CalcDirLight(DirLigth light, vec3 normal, vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
-float depthTest();
+float depthTest(vec3 fragPos);
 
 in vec3 FragPos;
 in vec3 FragNormal;
 in vec2 TexCoord;
-in vec4 lightSpace;
 
+uniform float farPlane;
 uniform vec3 lightColor;
 uniform vec3 lightPos;
 uniform vec3 cameraPos;
@@ -59,16 +59,14 @@ uniform SpotLight spotLight;
 uniform DirLigth dirLight;
 #define NR_POINT_LIGHTS 4
 uniform PointLight pointLights[NR_POINT_LIGHTS];
-uniform sampler2D shadowMap;
+uniform samplerCube shadowMap;
 
 out vec4 FragColor;
-
-
 
 void main() {
     // 基础向量
     vec3 norm = normalize(FragNormal);
-    float inShadow = depthTest();
+    float inShadow = depthTest(FragPos);
     vec3 viewDir = normalize(cameraPos - FragPos);
     vec3 result = CalcDirLight(dirLight, norm, viewDir);
     for (int i=0; i<NR_POINT_LIGHTS; i++) {
@@ -95,7 +93,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 lightDir = normalize(light.position - fragPos);
     float diff = max(dot(lightDir, normal), 0);
 
-    float distance = length(light.position - FragPos);
+    float distance = length(light.position - fragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * distance * distance);
 
     vec3 halfDir = normalize(viewDir + lightDir);
@@ -131,19 +129,26 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     return ambient + diffuse + specular;
 }
 
-float depthTest() {
-    vec3 projCoords = lightSpace.xyz / lightSpace.w * 0.5 + 0.5;
-    float shadow = 0.0;
-    float bias = max(0.05 * (1.0 - dot(normalize(FragNormal), normalize(lightPos - FragPos))), 0.005);
-    for (int x=-1; x<=1; x++) {
-        for (int y=-1; y<=1; y++) {
-            float curDepth = texture(shadowMap, projCoords.xy + vec2(x, y) / textureSize(shadowMap, 0)).r;
-            if (curDepth + bias < projCoords.z)
-                shadow += 1.0;
-        }
+float depthTest(vec3 fragPos) {
+    vec3 sampleOffsetDirections[20] = vec3[] (
+        vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+        vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+        vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+        vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+        vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+    );
+    vec3 fragToLight = fragPos - lightPos;
+    float closestDepth = texture(shadowMap, fragToLight).r * farPlane;
+    float curDepth = length(fragToLight);
+    float bias = max(0.05 * (1 - dot(normalize(FragNormal), normalize(-fragToLight))), 0.005);
+    float shadow = 0;
+    float samples = 20.0;
+    float viewDis = length(cameraPos - fragPos);
+    float diskRadius = (1.0 + (viewDis / farPlane)) / 25.0;
+    for (int i=0; i<20; i++) {
+        float closestDepth = texture(shadowMap, fragToLight + sampleOffsetDirections[i] * diskRadius).r * farPlane;
+        if (curDepth - bias > closestDepth)
+            shadow += 1.0;
     }
-    
-    if (projCoords.z > 1.0)
-        return 0.0;
-    return shadow / 9.0;
+    return shadow / samples;
 }

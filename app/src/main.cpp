@@ -101,7 +101,7 @@ int main() {
     Shader screenShader("../../shaders/vertexshaders/screen.shader", "../../shaders/fragmentshaders/screen.shader");
     Shader skyboxShader("../../shaders/vertexshaders/skybox.shader", "../../shaders/fragmentshaders/skybox.shader");
     Shader reflectShader("../../shaders/vertexshaders/reflect.shader", "../../shaders/fragmentshaders/reflect.shader");
-    Shader shadowShader("../../shaders/vertexshaders/shadow.shader", "../../shaders/fragmentshaders/shadow.shader");
+    Shader shadowShader("../../shaders/vertexshaders/shadow.shader", "../../shaders/fragmentshaders/shadow.shader", "../../shaders/geometryshaders/shadow.shader");
 
     unsigned int uniformBlockIndexShader = glGetUniformBlockIndex(shader.getProgramID(), "Matrices");
     unsigned int uniformBlockIndexLightShader = glGetUniformBlockIndex(lightShader.getProgramID(), "Matrices");
@@ -416,37 +416,72 @@ int main() {
     glGenFramebuffers(1, &depthMapFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 
-    unsigned int depthMap;
-    glGenTextures(1, &depthMap);
-    glActiveTexture(GL_TEXTURE0 + 5);
-    glBindTexture(GL_TEXTURE_2D, depthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float borderColor[] = {1.0, 1.0, 1.0, 1.0};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    // unsigned int depthMap;
+    // glGenTextures(1, &depthMap);
+    // glActiveTexture(GL_TEXTURE0 + 5);
+    // glBindTexture(GL_TEXTURE_2D, depthMap);
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    // float borderColor[] = {1.0, 1.0, 1.0, 1.0};
+    // glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    // glDrawBuffer(GL_NONE);
+    // glReadBuffer(GL_NONE);
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    unsigned int depthCubemap;
+    glGenTextures(1, &depthCubemap);
+    glActiveTexture(GL_TEXTURE0 + 5);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+    const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    for (unsigned int i=0; i<6; i++) 
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthCubemap, 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     glActiveTexture(GL_TEXTURE0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     Camera camLight;
-    camLight.position = {3.f, 3.f, 3.f};
+    camLight.position = lightPositions[0];
     camLight.forward = {-3.f, -3.f, -3.f};
     camLight.up = {0.f, 1.f, 0.f};
-    camLight.fov = 60.f;
+    camLight.fov = 90.f;
     camLight.aspect = 1;
     camLight.nearPlane = 1.0f;
-    camLight.farPlane = 10.5f;
+    camLight.farPlane = 25.f;
     camLight.speed = 0.05f;
 
-    Mat4 camLightVP = camLight.getProjectionMat() * camLight.getViewMat();
+    Mat4 camLightP = camLight.getProjectionMat();
+    std::vector<Mat4> camLightVPs = {
+        camLightP * Mat4::getViewMat(camLight.position, camLight.position + Vec3(1.0, 0.0, 0.0), Vec3(0.0, -1.0, 0.0)),
+        camLightP * Mat4::getViewMat(camLight.position, camLight.position + Vec3(-1.0, 0.0, 0.0), Vec3(0.0, -1.0, 0.0)),
+        camLightP * Mat4::getViewMat(camLight.position, camLight.position + Vec3(0.0, 1.0, 0.0), Vec3(0.0, 0.0, 1.0)),
+        camLightP * Mat4::getViewMat(camLight.position, camLight.position + Vec3(0.0, -1.0, 0.0), Vec3(0.0, 0.0, -1.0)),
+        camLightP * Mat4::getViewMat(camLight.position, camLight.position + Vec3(0.0, 0.0, 1.0), Vec3(0.0, -1.0, 0.0)),
+        camLightP * Mat4::getViewMat(camLight.position, camLight.position + Vec3(0.0, 0.0, -1.0), Vec3(0.0, -1.0, 0.0)),
+    };
     shadowShader.use();
-    shadowShader.setMat4("LightVP", camLightVP);
+    for (int i=0; i<camLightVPs.size(); i++)
+        shadowShader.setMat4("shadowMatrices[" + std::to_string(i) + "]", camLightVPs[i]);
+    shadowShader.setFloat("farPlane", camLight.farPlane);
+    shadowShader.setVec3("lightPos", camLight.position);
+    shader.use();
+    shader.setFloat("farPlane", camLight.farPlane);
+    shader.setVec3("lightPos", camLight.position);
+    shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
+    shader.setInt("shadowMap", 5);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouseCallback);
@@ -474,17 +509,11 @@ int main() {
 
     // glfwWindowShouldClose检查一次GLFW是否被要求退出，是就返回true，就停止循环，然后可以关闭应用程序
     while (!glfwWindowShouldClose(window)) {
-        // glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glClearColor(0.5f, 0.5f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // t1.setTexture();
-        // float radius = 10.f;
-        // float camX = sin(glfwGetTime()) * radius;
-        // float camZ = cos(glfwGetTime()) * radius;
-        // Mat4 view = Mat4::getViewMat({camX, 0, camZ}, {0.f, 0.f, 0.f}, {0, 1, 0});
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
         glCullFace(GL_FRONT);
-        glViewport(0, 0, 1024, 1024);
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
         glClear(GL_DEPTH_BUFFER_BIT);
         glBindVertexArray(VAO);
         shadowShader.use();
@@ -523,19 +552,11 @@ int main() {
         shader.setInt("material.specular", 1);
 
         float curTime = glfwGetTime();
-        // shader.setVec3("lightColor", {sin(curTime * 2.0f), sin(curTime * 0.3f), sin(curTime * 1.7f)});
-        shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
-        shader.setMat4("LightVP", camLightVP);
-        shader.setVec3("lightPos", camLight.position);
-        shader.setInt("shadowMap", 5);
-        // shader.setMat4("model", model);
-        // shader.setMat4("view", view);
-        // shader.setMat4("projection", proj);
         shader.setVec3("cameraPos", cam.position);
+        shader.setVec3("viewPos", cam.position);
 
         shader.setVec3("material.ambient", {1.0f, 0.5f, 0.31f});
         shader.setVec3("material.diffuse", {1.0f, 0.5f, 0.31f});
-        // shader.setVec3("material.specular", {0.5f, 0.5f, 0.5f});
         shader.setFloat("material.shininess", 32.0f);
         // 聚光灯
         shader.setVec3("spotLight.ambient", {0.2f, 0.2f, 0.2f});
@@ -596,7 +617,7 @@ int main() {
         // reflectShader.setVec3("camPos", cam.position);
         // reflectShader.setMat4("projection", proj);
         // reflectShader.setMat4("view", view);
-        shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
+        // shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
         shader.setVec3("lightColor", {1.0f, 1.0f, 1.0f});
         // float timeValue = glfwGetTime();
         // float greenValue = sin(timeValue) / 2.0f + 0.5f;

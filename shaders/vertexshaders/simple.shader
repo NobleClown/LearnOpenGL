@@ -13,14 +13,7 @@ layout (std140) uniform Matrices {
 
 uniform mat4 model;
 
-uniform mat4 LightVP;
-// uniform mat4 view;
-// uniform mat4 projection;
-
 out vec3 FragPos;
-out vec4 lightSpace;
-out mat4 inverseView;
-out mat4 inverseProj;
 out vec3 FragNormal;
 
 // out vec3 ourColor;
@@ -36,6 +29,5 @@ void main() {
     gl_Position = projection * view * worldPos;
     // gl_Position = model * vec4(aPos, 1.0);
     // ourColor = aColor;
-    lightSpace = LightVP * worldPos;
     TexCoord = aTexCoord;
 }

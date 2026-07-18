@@ -8,6 +8,7 @@
 class Shader {
 public:
     Shader(const std::string& vsPath, const std::string& fsPath);
+    Shader(const std::string& vsPath, const std::string& fsPath, const std::string& gsPath);
     ~Shader();
 
     void use() const;
@@ -19,10 +20,13 @@ public:
     void setFloat(const std::string& name, float value);
     void setMat4(const std::string& name, const Mat4& mat);
     void setVec3(const std::string& name, const Vec3& vec);
+    void setVec2(const std::string& name, const Vec2& vec);
 private:
     unsigned int programID;
 
     std::string loadFile(const std::string& path);
     unsigned int compile(GLenum type, const std::string& src);
     void link(unsigned int vs, unsigned int fs);
+    void link(unsigned int vs, unsigned int fs, unsigned int gs);
+    void checkLinkStatus() const;
 };
