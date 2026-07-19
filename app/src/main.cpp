@@ -76,8 +76,8 @@ int main() {
     if (!glfwInit()) return -1;
 
     // 指定主次版本号、以及使用核心模式
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // 创建窗口
@@ -182,6 +182,43 @@ int main() {
         -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 
         -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f  
     };
+
+    float tangent[108] = {0};
+
+    int vtx_cnt = 36;
+    for (int i=0; i<12; i++) {
+        Vec3 v1Pos = {vertices[i*3*8], vertices[i*3*8+1], vertices[i*3*8+2]};
+        Vec3 v2Pos = {vertices[(i*3+1)*8], vertices[(i*3+1)*8+1], vertices[(i*3+1)*8+2]};
+        Vec3 v3Pos = {vertices[(i*3+2)*8], vertices[(i*3+2)*8+1], vertices[(i*3+2)*8+2]};
+
+        Vec2 v1UV = {vertices[i*3*8+6], vertices[i*3*8+7]};
+        Vec2 v2UV = {vertices[(i*3+1)*8+6], vertices[(i*3+1)*8+7]};
+        Vec2 v3UV = {vertices[(i*3+2)*8+6], vertices[(i*3+2)*8+7]};
+        Vec3 edge1 = v2Pos - v1Pos;
+        Vec3 edge2 = v3Pos - v1Pos;
+
+        Vec2 deltaUV1 = v2UV - v1UV;
+        Vec2 deltaUV2 = v3UV - v1UV;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+        Vec3 tangentVec = {
+            f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x),
+            f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y),
+            f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z),
+        };
+        int t = i / 2;
+        if (t % 2 == 0)
+            tangentVec = tangentVec * (-1);
+        tangent[i*9] = tangentVec.x;
+        tangent[i*9+1] = tangentVec.y;
+        tangent[i*9+2] = tangentVec.z;
+        tangent[i*9+3] = tangentVec.x;
+        tangent[i*9+4] = tangentVec.y;
+        tangent[i*9+5] = tangentVec.z;
+        tangent[i*9+6] = tangentVec.x;
+        tangent[i*9+7] = tangentVec.y;
+        tangent[i*9+8] = tangentVec.z;
+    }
 
     float planeVertices[] = {
          5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
@@ -288,11 +325,6 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, 36 * 8 * 4, vertices, GL_STATIC_DRAW);
 
-    // 创建EBO，用于存储indexbuffer数据
-    // glGenBuffers(1, &EBO);
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, (void*)0);
     glEnableVertexAttribArray(0);
     
@@ -302,8 +334,13 @@ int main() {
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, (void*)24);
     glEnableVertexAttribArray(2);
 
-    // glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, (void*)(6 * 4));
-    // glEnableVertexAttribArray(2);
+    unsigned int tanVBO;
+    glGenBuffers(1, &tanVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, tanVBO);
+    glBufferData(GL_ARRAY_BUFFER, 36 * 3 * 4, tangent, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 12, (void*)0);
+    glEnableVertexAttribArray(3);
     glBindVertexArray(0);
 
     unsigned int lightVAO;
@@ -388,6 +425,11 @@ int main() {
     CubeTexture t_skybox;
     t_skybox.loadTexture(skyboxImagePaths, 4);
 
+    Texture t_brick, t_brickNorm, t_brickDisp;
+    t_brick.loadTexture("../../assets/bricks2.jpg", 5);
+    t_brickNorm.loadTexture("../../assets/bricks2_normal.jpg", 6);
+    t_brickDisp.loadTexture("../../assets/bricks2_disp.jpg", 7);
+
     unsigned int fbo;
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -466,8 +508,11 @@ int main() {
 
         glBindVertexArray(VAO);
         shader.use();
-        shader.setInt("material.diffuse", 0);
+        shader.setInt("material.diffuse", 5);
         shader.setInt("material.specular", 1);
+        shader.setInt("brick_normal", 6);
+        shader.setInt("brick_disp", 7);
+        shader.setFloat("height_scale", 0.1);
 
         float curTime = glfwGetTime();
         // shader.setVec3("lightColor", {sin(curTime * 2.0f), sin(curTime * 0.3f), sin(curTime * 1.7f)});
@@ -535,9 +580,9 @@ int main() {
         shader.setFloat("pointLights[3].linear", 0.09f);
         shader.setFloat("pointLights[3].quadratic", 0.032f);
 
-        reflectShader.use();
-        reflectShader.setInt("skybox", 4);
-        reflectShader.setVec3("camPos", cam.position);
+        // reflectShader.use();
+        // reflectShader.setInt("skybox", 4);
+        // reflectShader.setVec3("camPos", cam.position);
         // reflectShader.setMat4("projection", proj);
         // reflectShader.setMat4("view", view);
         // shader.setVec3("lightPos", {0.204011, 5.3189155, -3.042968});
@@ -557,13 +602,13 @@ int main() {
         //     mesh.draw();
         // }
         // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        for (int i=0; i<10; i++) {
-            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
-            Mat4 model = positions[i] * rotateMat;
-            // shader.setMat4("model", model);
-            reflectShader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        // for (int i=0; i<10; i++) {
+            // Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+        Mat4 model = positions[0];
+        shader.setMat4("model", model);
+        // reflectShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        // }
 
         lightShader.use();
         // lightShader.setMat4("model", lightModel);
