@@ -52,7 +52,6 @@ in vec2 TexCoord;
 in mat3 TBN;
 in vec3 viewDir;
 
-uniform vec3 lightColor;
 uniform vec3 cameraPos;
 uniform Material material;
 uniform SpotLight spotLight;
