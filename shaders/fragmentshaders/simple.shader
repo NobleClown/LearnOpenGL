@@ -63,8 +63,8 @@ uniform sampler2D brick_disp;
 uniform float height_scale;
 vec2 texCoords;
 
-out vec4 FragColor;
-
+layout (location = 0) out vec4 FragColor;
+layout (location = 1) out vec4 BrightColor;
 
 
 void main() {
@@ -83,6 +83,9 @@ void main() {
     result += CalcSpotLight(spotLight, norm, FragPos, viewDir);
 
     FragColor = vec4(result, 1.0);
+    float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+    if (brightness >= 1.0)
+        BrightColor = vec4(FragColor.rgb, 1.0);
 }
 
 vec3 CalcDirLight(DirLigth light, vec3 normal, vec3 viewDir) {

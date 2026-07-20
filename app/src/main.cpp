@@ -102,6 +102,7 @@ int main() {
     Shader skyboxShader("../../shaders/vertexshaders/skybox.shader", "../../shaders/fragmentshaders/skybox.shader");
     Shader reflectShader("../../shaders/vertexshaders/reflect.shader", "../../shaders/fragmentshaders/reflect.shader");
     Shader hdrShader("../../shaders/vertexshaders/hdr.shader", "../../shaders/fragmentshaders/hdr.shader");
+    Shader blurShader("../../shaders/vertexshaders/blur.shader", "../../shaders/fragmentshaders/blur.shader");
 
     unsigned int uniformBlockIndexShader = glGetUniformBlockIndex(shader.getProgramID(), "Matrices");
     unsigned int uniformBlockIndexLightShader = glGetUniformBlockIndex(lightShader.getProgramID(), "Matrices");
@@ -480,23 +481,48 @@ int main() {
     glGenFramebuffers(1, &hdrFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
-    unsigned int floatTexture;
-    glGenTextures(1, &floatTexture);
-    glActiveTexture(GL_TEXTURE0 + 8);
-    glBindTexture(GL_TEXTURE_2D, floatTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 800, 600, 0, GL_RGB, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glActiveTexture(GL_TEXTURE0);
+    unsigned int floatTexture[2];
+    glGenTextures(2, floatTexture);
 
     unsigned int rboDepth;
     glGenRenderbuffers(1, &rboDepth);
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 800, 600);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, floatTexture, 0);
+    
+    for (int i=0; i<2; i++) {
+        glActiveTexture(GL_TEXTURE0 + 8 + i);
+        glBindTexture(GL_TEXTURE_2D, floatTexture[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 800, 600, 0, GL_RGB, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, floatTexture[i], 0);
+        glActiveTexture(GL_TEXTURE0);
+    }
+
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+    unsigned int attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, attachments);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    unsigned int pingpongFBO[2];
+    unsigned int pingpongTexture[2];
+    glGenFramebuffers(2, pingpongFBO);
+    glGenTextures(2, pingpongTexture);
+    for (int i=0; i<2; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
+        glActiveTexture(GL_TEXTURE0 + 10 + i);
+        glBindTexture(GL_TEXTURE_2D, pingpongTexture[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 800, 600, 0, GL_RGB, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongTexture[i], 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouseCallback);
@@ -525,8 +551,9 @@ int main() {
     // glfwWindowShouldClose检查一次GLFW是否被要求退出，是就返回true，就停止循环，然后可以关闭应用程序
     while (!glfwWindowShouldClose(window)) {
         glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-        glClearColor(0.5f, 0.5f, 0.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
         // t1.setTexture();
         // float radius = 10.f;
         // float camX = sin(glfwGetTime()) * radius;
@@ -585,8 +612,8 @@ int main() {
         shader.setFloat("spotLight.quadratic", 0.032f);
         // 平行光、太阳光
         shader.setVec3("dirLight.ambient", {0.2f, 0.2f, 0.2f});
-        shader.setVec3("dirLight.diffuse", {5.f, 5.f, 5.f});
-        shader.setVec3("dirLight.specular", {10.0f, 10.0f, 10.0f});
+        shader.setVec3("dirLight.diffuse", {0.5f, 0.5f, 0.5f});
+        shader.setVec3("dirLight.specular", {1.0f, 1.0f, 1.0f});
         shader.setVec3("dirLight.direction", {-1.0f, -1.0f, -1.0f});
         // 其他点光源
         shader.setVec3("pointLights[0].ambient", {0.2f, 0.2f, 0.2f});
@@ -659,7 +686,7 @@ int main() {
         // lightShader.setMat4("model", lightModel);
         // lightShader.setMat4("view", view);
         // lightShader.setMat4("projection", proj);
-        lightShader.setVec3("LightColor", {1.0f, 1.0f, 1.0f});
+        lightShader.setVec3("LightColor", {15.0f, 15.0f, 15.0f});
 
         for (int i=0; i<4; i++) {
             lightShader.setMat4("model", lightModels[i]);
@@ -704,11 +731,29 @@ int main() {
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glDepthFunc(GL_LESS);
 
+        bool horizontal = true, first_iteration = true;
+        unsigned int amount = 10;
+        blurShader.use();
+        for (unsigned int i=0; i<10; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
+            blurShader.setInt("horizontal", horizontal);
+            if (first_iteration)
+                blurShader.setInt("image", 9);
+            else 
+                blurShader.setInt("image", 10 + !horizontal);
+            horizontal = !horizontal;
+            first_iteration = false;
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glBindVertexArray(0);
+        }
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClearColor(0.5f, 0.5f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         hdrShader.use();
         hdrShader.setInt("hdrBuffer", 8);
+        hdrShader.setInt("blurBloom", 11);
         hdrShader.setFloat("exposure", 0.1);
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
