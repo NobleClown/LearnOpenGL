@@ -674,13 +674,13 @@ int main() {
         //     mesh.draw();
         // }
         // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        // for (int i=0; i<10; i++) {
-            // Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
-        Mat4 model = positions[0];
-        shader.setMat4("model", model);
+        for (int i=0; i<10; i++) {
+            Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
+            Mat4 model = positions[i] * rotateMat;
+            shader.setMat4("model", model);
         // reflectShader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        // }
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
 
         lightShader.use();
         // lightShader.setMat4("model", lightModel);
