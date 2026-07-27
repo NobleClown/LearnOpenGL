@@ -18,12 +18,12 @@ out vec2 TexCoords;
 out mat3 TBN;
 
 void main() {
-    vec4 worldPos = model * vec4(aPos, 1.0);
+    vec4 worldPos = view * model * vec4(aPos, 1.0);
     FragPos = worldPos.xyz;
     
-    FragNormal = mat3(transpose(inverse(model))) * norm;
+    FragNormal = mat3(transpose(inverse(view * model))) * norm;
 
-    gl_Position = projection * view * worldPos;
+    gl_Position = projection * worldPos;
     TexCoords = aTexCoord;
 
     vec3 T = normalize(tangentVec);

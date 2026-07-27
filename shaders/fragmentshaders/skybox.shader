@@ -3,13 +3,12 @@
 in vec3 TexCoords;
 
 uniform samplerCube skybox;
-
-layout (location = 0) out vec4 FragColor;
-layout (location = 1) out vec4 BrightColor;
+out vec4 FragColor;
 
 void main() {
-    FragColor = texture(skybox, TexCoords);
-    float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    if (brightness >= 1.0)
-        BrightColor = vec4(FragColor.rgb, 1.0);
+    vec3 envColor = texture(skybox, TexCoords).rgb;
+    envColor = envColor / (envColor + vec3(1.0));
+    envColor = pow(envColor, vec3(1.0 / 2.2));
+
+    FragColor = vec4(envColor, 1.0);
 }

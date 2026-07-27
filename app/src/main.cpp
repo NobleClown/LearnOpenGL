@@ -103,12 +103,16 @@ int main() {
     Shader ssaoShader("../../shaders/vertexshaders/ssao.shader", "../../shaders/fragmentshaders/ssao.shader");
     Shader ssaoblurShader("../../shaders/vertexshaders/ssaoblur.shader", "../../shaders/fragmentshaders/ssaoblur.shader");
     Shader pbrShader("../../shaders/vertexshaders/pbr.shader", "../../shaders/fragmentshaders/pbr.shader");
+    Shader loftShader("../../shaders/vertexshaders/precompute.shader", "../../shaders/fragmentshaders/precompute.shader");
+    Shader irradianceShader("../../shaders/vertexshaders/irradiance.shader", "../../shaders/fragmentshaders/irradiance.shader");
+    Shader prefilteredShader("../../shaders/vertexshaders/prefiltered.shader", "../../shaders/fragmentshaders/prefiltered.shader");
+    Shader brdfShader("../../shaders/vertexshaders/brdf.shader", "../../shaders/fragmentshaders/brdf.shader");
 
     unsigned int uniformBlockIndexLightShader = glGetUniformBlockIndex(lightShader.getProgramID(), "Matrices");
-    unsigned int uniformBlockIndexPbrShader = glGetUniformBlockIndex(pbrShader.getProgramID(), "Matrices");
+    unsigned int uniformBlockIndexLoftShader = glGetUniformBlockIndex(loftShader.getProgramID(), "Matrices");
 
     glUniformBlockBinding(lightShader.getProgramID(), uniformBlockIndexLightShader, 0);
-    glUniformBlockBinding(pbrShader.getProgramID(), uniformBlockIndexPbrShader, 0);
+    glUniformBlockBinding(loftShader.getProgramID(), uniformBlockIndexLoftShader, 0);
 
     unsigned int uboMatrices;
     glGenBuffers(1, & uboMatrices);
@@ -275,6 +279,54 @@ int main() {
         1.0f, -1.0f,  1.0f
     };
 
+    float loftboxVertices[] = {
+        // positions          
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f
+    };
+
+    for (int i=0; i<108; i++)
+        loftboxVertices[i] /= 2;
+
     Vec3 planePositions[] = {
         {-1.5f, 0.0f, -0.48f},
         { 1.5f, 0.1f,  0.51f},
@@ -304,10 +356,10 @@ int main() {
     };
 
     Vec3 lightColors[] = {
-        {1.0, 0.0, 0.0},
-        {0.0, 1.0, 0.0},
-        {0.0, 0.0, 1.0},
-        {1.0, 1.0, 1.0}
+        {10.0, 0.0, 0.0},
+        {0.0, 10.0, 0.0},
+        {0.0, 0.0, 10.0},
+        {10.0, 10.0, 10.0}
     };
 
     float quadVertices[] = {
@@ -411,6 +463,19 @@ int main() {
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
 
+    unsigned int loftVAO, loftVBO;
+
+    glGenVertexArrays(1, &loftVAO);
+    glBindVertexArray(loftVAO);
+
+    glGenBuffers(1, &loftVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, loftVBO);
+    glBufferData(GL_ARRAY_BUFFER, 36 * 3 * 4, loftboxVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_CULL_FACE);
@@ -462,6 +527,9 @@ int main() {
     t_normal.loadTexture("../../assets/rustediron1-alt2-bl/rustediron2_normal.png", 3);
     t_metallic.loadTexture("../../assets/rustediron1-alt2-bl/rustediron2_metallic.png", 5);
     t_spec.loadTexture("../../assets/matrix.jpg", 1);
+
+    Texture t_hdr;
+    t_hdr.loadHDRTexture("../../assets/newport_loft.hdr", 14);
 
     CubeTexture t_skybox;
     t_skybox.loadTexture(skyboxImagePaths, 4);
@@ -562,6 +630,72 @@ int main() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoBlurColorBuffer, 0);
 
+    unsigned int captureFBO, captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+
+    glGenRenderbuffers(1, &captureRBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+    unsigned int envCubeMap;
+    glGenTextures(1, &envCubeMap);
+    glActiveTexture(GL_TEXTURE15);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubeMap);
+    for (unsigned int i=0; i<6; i++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, NULL);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    unsigned int irradianceMap;
+    glActiveTexture(GL_TEXTURE16);
+    glGenTextures(1, &irradianceMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+
+    for (int i=0; i<6; i++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, NULL);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    unsigned int prefilterMap;
+    glActiveTexture(GL_TEXTURE17);
+    glGenTextures(1, &prefilterMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+
+    for (unsigned int i=0; i<6; i++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, NULL);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+    unsigned int brdfLUTTexture;
+    glActiveTexture(GL_TEXTURE18);
+    glGenTextures(1, &brdfLUTTexture);
+
+    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetScrollCallback(window, scrollCallback);
@@ -584,11 +718,99 @@ int main() {
         Mat4::getTranslateMat(planePositions[4]),
     };
 
+    Mat4 captureProjection = Mat4::getPerspectiveMat(90, 1, 0.1, 10.f);
+    std::vector<Mat4> captureViews = {
+        Mat4::getViewMat({0, 0, 0}, {1, 0, 0}, {0, -1, 0}),
+        Mat4::getViewMat({0, 0, 0}, {-1, 0, 0}, {0, -1, 0}),
+        Mat4::getViewMat({0, 0, 0}, {0, 1, 0}, {0, 0, 1}),
+        Mat4::getViewMat({0, 0, 0}, {0, -1, 0}, {0, 0, -1}),
+        Mat4::getViewMat({0, 0, 0}, {0, 0, 1}, {0, -1, 0}),
+        Mat4::getViewMat({0, 0, 0}, {0, 0, -1}, {0, -1, 0}),
+    };
+
     float constant = 1.0;
     float linear = 0.7;
     float quadratic = 1.8;
     float lightMAx = 1.0;
     float radius = (-linear + std::sqrtf(linear * linear - 4 * quadratic *(constant - (256.0 / 5.0) * lightMAx)));
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    
+    loftShader.use();
+    loftShader.setInt("loft", 14);
+    loftShader.setMat4("projection", captureProjection);
+    
+    glViewport(0, 0, 512, 512);
+    for (int i=0; i<6; i++) {
+        loftShader.setMat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubeMap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(loftVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+
+    glActiveTexture(GL_TEXTURE15);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubeMap);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+    irradianceShader.use();
+    irradianceShader.setMat4("projection", captureProjection);
+    irradianceShader.setInt("loft", 15);
+    glViewport(0, 0, 32, 32);
+
+    for (unsigned int i=0; i<6; i++) {
+        irradianceShader.setMat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(loftVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
+
+    prefilteredShader.use();
+    prefilteredShader.setInt("environmentMap", 15);
+    prefilteredShader.setMat4("projection", captureProjection);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    unsigned int maxMipLevels = 5;
+    for (unsigned int mip=0; mip<maxMipLevels; mip++) {
+        unsigned int mipWidth = 128 * std::pow(0.5, mip);
+        unsigned int mipHeight = 128 * std::pow(0.5, mip);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+        glViewport(0, 0, mipWidth, mipHeight);
+
+        float roughness = (float) mip / (float)(maxMipLevels - 1);
+        prefilteredShader.setFloat("roughness", roughness);
+        for (unsigned int i=0; i<6; i++) {
+            prefilteredShader.setMat4("view", captureViews[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glBindVertexArray(loftVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
+
+    glViewport(0, 0, 512, 512);
+    brdfShader.use();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glBindVertexArray(loftVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, 800, 600);
+
+    // 立方体贴图面之间进行正确过滤
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     // glfwWindowShouldClose检查一次GLFW是否被要求退出，是就返回true，就停止循环，然后可以关闭应用程序
     while (!glfwWindowShouldClose(window)) {
@@ -622,7 +844,7 @@ int main() {
         gbufferShader.setInt("texture_specular1", 1);
         gbufferShader.setInt("texture_normal", 3);
 
-        for (int i=0; i<10; i++) {
+        for (int i=1; i<10; i++) {
             Mat4 rotateMat = Mat4::getRotateMat({5.f * (i + 1), 10.f * (i + 1), 0.f});
             Mat4 model = positions[i] * rotateMat;
             gbufferShader.setMat4("model", model);
@@ -658,7 +880,9 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         pbrShader.use();
-
+        glActiveTexture(GL_TEXTURE16);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+        pbrShader.setMat4("view", view);
         for (int i=0; i<4; i++) {
             pbrShader.setVec3("pointLights[" + std::to_string(i) + "].position", lightPositions[i]);
             pbrShader.setVec3("pointLights[" + std::to_string(i) + "].color", lightColors[i]);
@@ -670,7 +894,10 @@ int main() {
         pbrShader.setInt("gNormal", 7);
         pbrShader.setInt("gAlbedoSpec", 8);
         pbrShader.setInt("gMetalRough", 9);
+        pbrShader.setInt("gIrradiance", 16);
         pbrShader.setInt("ssao", 13);
+        pbrShader.setInt("prefilteredMap", 17);
+        pbrShader.setInt("brdfLUT", 18);
 
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -694,9 +921,9 @@ int main() {
         skyboxShader.use();
         skyboxShader.setMat4("projection", proj);
         skyboxShader.setMat4("view", viewSkybox);
-        skyboxShader.setInt("skybox", 4);
+        skyboxShader.setInt("skybox", 15);
         glBindVertexArray(skyboxVAO);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, t_skybox.getTextureID());
+        // glBindTexture(GL_TEXTURE_CUBE_MAP, t_skybox.getTextureID());
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glDepthFunc(GL_LESS);
         

@@ -30,6 +30,26 @@ void Texture::loadTexture(const char* path, const int texCnt) {
     stbi_image_free(data);  
 }
 
+void Texture::loadHDRTexture(const char* path, const int texCnt) {
+    // 加载纹理图像
+    stbi_set_flip_vertically_on_load(true);
+    float* fdata = stbi_loadf(path, &m_width, &m_height, &m_nrChannels, 0);
+    // 生成纹理（空间）
+    glGenTextures(1, &texture);
+    // 激活纹理
+    glActiveTexture(GL_TEXTURE0 + texCnt);
+    // 绑定纹理（当前处理该纹理）
+    glBindTexture(GL_TEXTURE_2D, texture);
+    // 设置环绕、过滤方式
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_width, m_height, 0, GL_RGB, GL_FLOAT, fdata);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    stbi_image_free(fdata);  
+}
+
 void Texture::loadTexture(const int texCnt) {
     m_width = 800;
     m_height = 600;

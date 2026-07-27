@@ -8,6 +8,7 @@
 class Texture {
 public:
     void loadTexture(const char* path, const int texCnt);
+    void loadHDRTexture(const char* path, const int texCnt);
     void loadTexture(const int texCnt);
     void setTexture();
     unsigned int getTextureID() const { return texture; }
